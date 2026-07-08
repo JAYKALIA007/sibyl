@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "ollama:check": "tsx ollama.ts",
+    "db:check": "node --import tsx --env-file=.env db.ts",
     "test": "node --import tsx --test *.test.ts"
   },
   "license": "MIT",
@@ -12,5 +13,9 @@
     "@types/node": "^22.10.0",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2"
+  },
+  "dependencies": {
+    "@types/pg": "^8.20.0",
+    "pg": "^8.22.0"
   }
 }
