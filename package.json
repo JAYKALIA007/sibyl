@@ -9,7 +9,7 @@
     "schema:ddl": "node --import tsx --env-file=.env introspect.ts",
     "nl2sql:check": "node --import tsx --env-file=.env nl2sql.ts",
     "core:check": "node --import tsx --env-file=.env core.ts",
-    "cli": "node --import tsx --env-file=.env cli.ts",
+    "sibyl": "node --import tsx --env-file=.env cli.ts",
     "test": "node --import tsx --test *.test.ts"
   },
   "license": "MIT",
