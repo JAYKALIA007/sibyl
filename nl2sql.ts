@@ -17,8 +17,14 @@ const SYSTEM = [
   `- If the question cannot be answered from the schema, output exactly: ${NO_ANSWER}`,
 ].join('\n')
 
-function buildPrompt(ddl: string, question: string): string {
-  return `Schema:\n${ddl}\n\nQuestion: ${question}\n\nSQL:`
+type Feedback = { sql: string; error: string }
+
+function buildPrompt(ddl: string, question: string, feedback?: Feedback): string {
+  let p = `Schema:\n${ddl}\n\nQuestion: ${question}`
+  if (feedback) {
+    p += `\n\nYour previous query failed — fix it.\nPrevious SQL: ${feedback.sql}\nError: ${feedback.error}`
+  }
+  return `${p}\n\nSQL:`
 }
 
 // Strip a markdown code fence if the model wrapped the SQL in one.
@@ -31,9 +37,9 @@ function extractSql(raw: string): string {
 export async function toSql(
   ddl: string,
   question: string,
-  opts: { temperature?: number } = {}
+  opts: { temperature?: number; feedback?: Feedback } = {}
 ): Promise<string> {
-  const raw = await generate(buildPrompt(ddl, question), {
+  const raw = await generate(buildPrompt(ddl, question, opts.feedback), {
     temperature: opts.temperature ?? 0,
     system: SYSTEM,
   })
