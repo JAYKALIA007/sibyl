@@ -7,6 +7,7 @@
     "ollama:check": "tsx ollama.ts",
     "db:check": "node --import tsx --env-file=.env db.ts",
     "schema:ddl": "node --import tsx --env-file=.env introspect.ts",
+    "nl2sql:check": "node --import tsx --env-file=.env nl2sql.ts",
     "test": "node --import tsx --test *.test.ts"
   },
   "license": "MIT",
