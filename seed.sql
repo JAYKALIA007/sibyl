@@ -57,3 +57,14 @@ INSERT INTO orders (user_id, product_id, quantity, status) VALUES
   (4, 1, 1, 'cancelled'),
   (5, 3, 2, 'completed'),
   (1, 6, 1, 'completed');
+
+-- Supabase auto-enables Row Level Security on new public tables, which hides ALL
+-- rows from the read-only role (RLS with no policy = deny all). Add permissive
+-- SELECT policies so Sibyl can read. Writes stay blocked by the role's lack of
+-- INSERT/UPDATE/DELETE grants — RLS is a separate, orthogonal layer.
+ALTER TABLE users    ENABLE ROW LEVEL SECURITY;
+ALTER TABLE products ENABLE ROW LEVEL SECURITY;
+ALTER TABLE orders   ENABLE ROW LEVEL SECURITY;
+CREATE POLICY sibyl_read ON users    FOR SELECT USING (true);
+CREATE POLICY sibyl_read ON products FOR SELECT USING (true);
+CREATE POLICY sibyl_read ON orders   FOR SELECT USING (true);
