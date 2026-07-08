@@ -90,7 +90,7 @@ the execution-accuracy eval (#9) measures the difference.
 ## Setup (seed database + read-only role)
 
 See [`SETUP.md`](./SETUP.md) for the full walkthrough:
-1. Load `seed.sql` into Postgres (creates `users`, `products`, `orders`).
+1. Load `seed.sql` into Postgres (creates `users`, `products`, `orders`, `reviews`).
 2. Create a `sibyl_ro` read-only role.
 3. Add the connection string to `.env`.
 
