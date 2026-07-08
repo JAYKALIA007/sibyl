@@ -17,6 +17,11 @@ behind a CLI and (later) a web GUI.
 
 See [`DESIGN.md`](./DESIGN.md) for the full architecture and locked decisions.
 
+## Setup
+
+See [`SETUP.md`](./SETUP.md) — load the seed database and create the read-only role
+(one time). Then `cp .env.example .env` and fill in your connection string.
+
 ## Status
 
 🚧 Early. Design locked; building in vertical slices (tracked in
