@@ -4,7 +4,8 @@
   "description": "Ask your database in plain English — a from-scratch, local-first natural-language-to-SQL tool.",
   "type": "module",
   "scripts": {
-    "ollama:check": "tsx ollama.ts"
+    "ollama:check": "tsx ollama.ts",
+    "test": "node --import tsx --test *.test.ts"
   },
   "license": "MIT",
   "devDependencies": {
