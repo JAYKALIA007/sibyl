@@ -6,8 +6,11 @@ Supabase project (any Postgres works).
 ## 1. Load the seed database
 
 Open the Supabase **SQL Editor** and run the contents of [`seed.sql`](./seed.sql).
-This creates the `users` / `products` / `orders` tables and sample rows. Run it as
-the default (owner) role — the read-only role can't create tables.
+This creates 16 interconnected tables (`users`, `addresses`, `suppliers`,
+`categories`, `products`, `inventory`, `tags`, `product_tags`, `coupons`,
+`orders`, `order_items`, `payments`, `shipments`, `returns`, `reviews`,
+`wishlists`) and sample rows. Run it as the default (owner) role — the
+read-only role can't create tables.
 
 ## 2. Create the read-only role
 
