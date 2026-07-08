@@ -1,0 +1,15 @@
+{
+  "name": "sibyl",
+  "version": "0.1.0",
+  "description": "Ask your database in plain English — a from-scratch, local-first natural-language-to-SQL tool.",
+  "type": "module",
+  "scripts": {
+    "ollama:check": "tsx ollama.ts"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}
