@@ -54,7 +54,7 @@ cp .env.example .env
 #    See SETUP.md for the full read-only role setup.
 
 # 5. Start the REPL
-npm run cli
+npm run sibyl
 ```
 
 ### Using your own database
@@ -131,7 +131,7 @@ npm run schema:ddl     # print live schema as DDL
 npm run nl2sql:check   # generate SQL for sample questions
 npm run core:check     # run sample questions end-to-end
 npm run test           # unit tests (guard + schema formatter)
-npm run cli            # interactive REPL
+npm run sibyl            # interactive REPL
 ```
 
 ## Status
