@@ -260,20 +260,26 @@ pnpm sibyl          # interactive REPL
 ## Measuring accuracy
 
 `pnpm eval` scores generated SQL against hand-written **gold SQL** by *executing
-both and comparing the rows* — not by matching query text. The brain is swappable;
-the eval decides which brain wins:
+both and comparing the rows* — not by matching query text. The 19 cases span
+filters, joins, group-by, `HAVING`, subqueries, self-joins, junction `AND`/`NOT`,
+`NULL` logic, multi-table revenue aggregation, top-N ordering, and an off-schema
+refusal. The brain is swappable; the eval decides which brain wins:
 
 ```
 Sibyl execution-accuracy eval — model: qwen2.5-coder
-  ✓  [filter] · ✓ [aggregation] · ✓ [join] · ✓ [group-by] · ✓ [ordered]
-  ✓  [anti-join] · ✓ [junction-and] · ✓ [off-schema-refusal]
-  Score: 9/9 (100%)
+  ✓ filter  ✓ aggregation×2  ✓ join  ✓ group-by  ✓ ordered  ✓ anti-join
+  ✓ junction-and  ✓ subquery  ✓ having×2  ✓ multi-join-agg  ✓ self-join
+  ✗ null-logic  ✓ anti-junction  ✓ nested-agg  ✓ distinct  ✓ top-n  ✓ refusal
+  Score: 18/19 (95%)
 ```
 
-Swap the model to see the number move:
+The one miss is instructive: asked which shipments have *shipped but not been
+delivered*, the model invents a `status` column instead of reasoning about the
+`shipped_at` / `delivered_at` NULLs — a single-shot slip the CLI's retry loop
+usually recovers from. Swap to a weaker/general model and the score drops sharply:
 
 ```bash
-SIBYL_CHAT_MODEL=llama3.2 pnpm eval    # → 7/9 (78%): misses AND-tag + ordering
+SIBYL_CHAT_MODEL=llama3.2 pnpm eval    # a general 3B model misses most of the hard rungs
 ```
 
 ### Multi-turn eval

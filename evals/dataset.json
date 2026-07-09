@@ -49,6 +49,67 @@
     "goldSQL": "SELECT p.name FROM products p JOIN product_tags pt ON pt.product_id = p.id JOIN tags t ON t.id = pt.tag_id WHERE t.name IN ('work-from-home', 'premium') GROUP BY p.id, p.name HAVING COUNT(DISTINCT t.name) = 2"
   },
   {
+    "id": "subquery-01",
+    "rung": "subquery",
+    "question": "Which products cost more than the average product price? List their names.",
+    "goldSQL": "SELECT name FROM products WHERE price > (SELECT AVG(price) FROM products)"
+  },
+  {
+    "id": "having-01",
+    "rung": "having",
+    "question": "Which categories have more than 3 products? Show the category name and the product count.",
+    "goldSQL": "SELECT c.name, COUNT(p.id) AS n FROM categories c JOIN products p ON p.category_id = c.id GROUP BY c.name HAVING COUNT(p.id) > 3"
+  },
+  {
+    "id": "having-join-01",
+    "rung": "having",
+    "question": "Which products have at least 3 reviews? Show the product name and the number of reviews.",
+    "goldSQL": "SELECT p.name, COUNT(r.id) AS n FROM products p JOIN reviews r ON r.product_id = p.id GROUP BY p.name HAVING COUNT(r.id) >= 3"
+  },
+  {
+    "id": "multi-join-agg-01",
+    "rung": "multi-join-agg",
+    "question": "For each product category, what is the total revenue from order items (quantity times unit price)? Show the category name and the total.",
+    "goldSQL": "SELECT c.name, SUM(oi.quantity * oi.unit_price) AS revenue FROM order_items oi JOIN products p ON p.id = oi.product_id JOIN categories c ON c.id = p.category_id GROUP BY c.name"
+  },
+  {
+    "id": "self-join-01",
+    "rung": "self-join",
+    "question": "List each subcategory and the name of its parent category.",
+    "goldSQL": "SELECT c.name, p.name AS parent FROM categories c JOIN categories p ON c.parent_id = p.id"
+  },
+  {
+    "id": "null-logic-01",
+    "rung": "null-logic",
+    "question": "Which shipments have shipped but not been delivered yet? List their tracking numbers.",
+    "goldSQL": "SELECT tracking_number FROM shipments WHERE shipped_at IS NOT NULL AND delivered_at IS NULL"
+  },
+  {
+    "id": "anti-junction-01",
+    "rung": "anti-junction",
+    "question": "Which products are tagged 'work-from-home' but NOT 'premium'? List their names.",
+    "goldSQL": "SELECT p.name FROM products p JOIN product_tags pt ON pt.product_id = p.id JOIN tags t ON t.id = pt.tag_id WHERE t.name = 'work-from-home' AND p.id NOT IN (SELECT pt2.product_id FROM product_tags pt2 JOIN tags t2 ON t2.id = pt2.tag_id WHERE t2.name = 'premium')"
+  },
+  {
+    "id": "nested-agg-01",
+    "rung": "nested-agg",
+    "question": "Which order has the highest total value (sum of quantity times unit price across its items)? Give just the order id.",
+    "goldSQL": "SELECT order_id FROM order_items GROUP BY order_id ORDER BY SUM(quantity * unit_price) DESC LIMIT 1"
+  },
+  {
+    "id": "distinct-01",
+    "rung": "distinct",
+    "question": "How many different countries do our users come from?",
+    "goldSQL": "SELECT COUNT(DISTINCT country) AS n FROM users"
+  },
+  {
+    "id": "top-n-01",
+    "rung": "top-n",
+    "ordered": true,
+    "question": "What are the 3 most expensive products? List their names, most expensive first.",
+    "goldSQL": "SELECT name FROM products ORDER BY price DESC LIMIT 3"
+  },
+  {
     "id": "refusal-01",
     "rung": "off-schema-refusal",
     "question": "Who is the current CEO of Google?",
