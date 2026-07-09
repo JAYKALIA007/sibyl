@@ -136,7 +136,8 @@ npm run schema:ddl     # print live schema as DDL
 npm run nl2sql:check   # generate SQL for sample questions
 npm run core:check     # run sample questions end-to-end
 npm run test           # unit tests (comparator + guard + schema formatter)
-npm run eval           # execution-accuracy eval (score vs gold SQL)
+npm run eval           # single-turn execution-accuracy eval (score vs gold SQL)
+npm run eval:multi     # multi-turn (conversational) eval + memory controls
 npm run sibyl          # interactive REPL
 ```
 
@@ -157,6 +158,19 @@ Swap the model to see the number move:
 
 ```bash
 SIBYL_CHAT_MODEL=llama3.2 npm run eval    # → 7/9 (78%): misses AND-tag + ordering
+```
+
+### Multi-turn eval
+
+`npm run eval:multi` scores *conversations* — later turns refer back ("how many
+did **they** order?"). It self-threads (feeds the model its own prior SQL, like the
+CLI does) and reports two numbers plus a **no-history control** that proves the
+memory — not luck — is doing the work:
+
+```
+Per-step:         8/8 (100%)
+Per-conversation: 4/4 (100%)
+Memory controls:  4/4 referential steps confirmed history-dependent
 ```
 
 ## Status

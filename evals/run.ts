@@ -13,10 +13,9 @@ import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 import { loadSchema } from '../core.ts'
-import { toSql, NO_ANSWER } from '../nl2sql.ts'
-import { guard } from '../guard.ts'
-import { runQuery, close } from '../db.ts'
-import { rowsEqual, type Row } from '../rowsEqual.ts'
+import { close } from '../db.ts'
+import { rowsEqual } from '../rowsEqual.ts'
+import { generateAndRun, runGold } from './shared.ts'
 
 type EvalItem = {
   id: string
@@ -32,35 +31,24 @@ type Outcome = { item: EvalItem; pass: boolean; detail: string }
 const here = dirname(fileURLToPath(import.meta.url))
 const dataset: EvalItem[] = JSON.parse(readFileSync(join(here, 'dataset.json'), 'utf8'))
 
-async function runGold(sql: string): Promise<Row[]> {
-  const res = await runQuery(sql)
-  if ('error' in res) throw new Error(`gold SQL failed: ${res.error}`)
-  return res.rows
-}
-
 async function evaluate(ddl: string, item: EvalItem): Promise<Outcome> {
-  const sql = await toSql(ddl, item.question, { temperature: 0 })
+  const r = await generateAndRun(ddl, item.question)
 
   // Off-schema items: correct iff the model refuses.
   if (item.expect === 'refused') {
-    return sql === NO_ANSWER
+    return r.kind === 'refused'
       ? { item, pass: true, detail: 'refused as expected' }
-      : { item, pass: false, detail: `should have refused, produced: ${sql.replace(/\s+/g, ' ')}` }
+      : { item, pass: false, detail: 'should have refused' }
   }
 
-  if (sql === NO_ANSWER) return { item, pass: false, detail: 'unexpected refusal' }
-
-  const g = guard(sql)
-  if (!g.ok) return { item, pass: false, detail: `guard rejected: ${g.reason}` }
-
-  const res = await runQuery(g.sql)
-  if ('error' in res) return { item, pass: false, detail: `execution error: ${res.error}` }
+  if (r.kind === 'refused') return { item, pass: false, detail: 'unexpected refusal' }
+  if (r.kind === 'error') return { item, pass: false, detail: r.error }
 
   const gold = await runGold(item.goldSQL!)
-  const ok = rowsEqual(res.rows, gold, { ordered: item.ordered })
+  const ok = rowsEqual(r.rows, gold, { ordered: item.ordered })
   return ok
-    ? { item, pass: true, detail: `${res.rows.length} rows match` }
-    : { item, pass: false, detail: `got ${res.rows.length} rows, expected ${gold.length} (or values differ)` }
+    ? { item, pass: true, detail: `${r.rows.length} rows match` }
+    : { item, pass: false, detail: `got ${r.rows.length} rows, expected ${gold.length} (or values differ)` }
 }
 
 async function main(): Promise<void> {

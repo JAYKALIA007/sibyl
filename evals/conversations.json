@@ -1,0 +1,58 @@
+[
+  {
+    "id": "usa-users-orders",
+    "steps": [
+      {
+        "question": "Which users are from the USA? List their names.",
+        "goldSQL": "SELECT name FROM users WHERE country = 'USA'"
+      },
+      {
+        "question": "How many orders did they place in total?",
+        "referential": true,
+        "goldSQL": "SELECT COUNT(*) AS n FROM orders WHERE user_id IN (SELECT id FROM users WHERE country = 'USA')"
+      }
+    ]
+  },
+  {
+    "id": "stationery-priciest",
+    "steps": [
+      {
+        "question": "List the names of products in the Stationery category.",
+        "goldSQL": "SELECT p.name FROM products p JOIN categories c ON c.id = p.category_id WHERE c.name = 'Stationery'"
+      },
+      {
+        "question": "Which of those is the most expensive? Give just its name.",
+        "referential": true,
+        "goldSQL": "SELECT p.name FROM products p JOIN categories c ON c.id = p.category_id WHERE c.name = 'Stationery' ORDER BY p.price DESC LIMIT 1"
+      }
+    ]
+  },
+  {
+    "id": "users-by-country-ellipsis",
+    "steps": [
+      {
+        "question": "How many users are from India?",
+        "goldSQL": "SELECT COUNT(*) AS n FROM users WHERE country = 'India'"
+      },
+      {
+        "question": "And from Germany?",
+        "referential": true,
+        "goldSQL": "SELECT COUNT(*) AS n FROM users WHERE country = 'Germany'"
+      }
+    ]
+  },
+  {
+    "id": "five-star-reviewers",
+    "steps": [
+      {
+        "question": "Which products have received a 5-star review? List their distinct names.",
+        "goldSQL": "SELECT DISTINCT p.name FROM products p JOIN reviews r ON r.product_id = p.id WHERE r.rating = 5"
+      },
+      {
+        "question": "Which users wrote those reviews? List their distinct names.",
+        "referential": true,
+        "goldSQL": "SELECT DISTINCT u.name FROM users u JOIN reviews r ON r.user_id = u.id WHERE r.rating = 5"
+      }
+    ]
+  }
+]
