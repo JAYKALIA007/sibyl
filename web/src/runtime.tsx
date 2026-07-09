@@ -18,17 +18,16 @@ function lastUserText(messages: readonly { role: string; content: readonly unkno
     .trim()
 }
 
-// Basic text rendering for this slice — the rich message (table, meter, distinct
-// states) arrives in the next slice. Faults (thrown by ask) propagate to the
-// runtime's error state; the dedicated fault banner also comes later.
-function resultToText(result: AskResult): string {
+// A short text fallback (accessibility / non-custom renderers). The rich message
+// renders from metadata.custom.result; this text is the plain-words version.
+function fallbackText(result: AskResult): string {
   switch (result.kind) {
     case 'answer':
-      return `${result.summary}\n\n\`\`\`sql\n${result.sql}\n\`\`\``
+      return result.summary
     case 'refused':
       return `⚠ ${result.reason}`
     case 'error':
-      return `✗ Couldn't build a valid query after ${result.attempts} attempt${result.attempts === 1 ? '' : 's'}.\n${result.error}`
+      return `✗ Couldn't build a valid query after ${result.attempts} attempt${result.attempts === 1 ? '' : 's'}.`
   }
 }
 
@@ -37,7 +36,12 @@ const adapter: ChatModelAdapter = {
     const question = lastUserText(messages)
     // History threading (window of 3) lands in a later slice; send none for now.
     const result = await ask(question, [])
-    return { content: [{ type: 'text', text: resultToText(result) }] }
+    // The full result rides along in metadata.custom; the assistant message reads it
+    // to render SQL + table + summary + meter. Faults thrown by ask propagate.
+    return {
+      content: [{ type: 'text', text: fallbackText(result) }],
+      metadata: { custom: { result } },
+    }
   },
 }
 
