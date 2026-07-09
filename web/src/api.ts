@@ -41,3 +41,15 @@ export async function getMeta(): Promise<Meta | null> {
     return null
   }
 }
+
+// Schema-aware starter questions for the empty state; [] on failure.
+export async function getSuggestions(): Promise<string[]> {
+  try {
+    const res = await fetch(`${API}/suggestions`)
+    if (!res.ok) return []
+    const body = (await res.json()) as { suggestions?: string[] }
+    return Array.isArray(body.suggestions) ? body.suggestions : []
+  } catch {
+    return []
+  }
+}

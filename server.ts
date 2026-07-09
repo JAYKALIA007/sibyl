@@ -12,6 +12,7 @@ import { fileURLToPath } from 'node:url'
 import { ask, loadSchema, type Turn } from './core.ts'
 import { close } from './db.ts'
 import { checkOllama, CHAT_MODEL, OLLAMA } from './ollama.ts'
+import { getSuggestions } from './suggestions.ts'
 import { mapResult, mapFault } from './responseMapper.ts'
 
 const HOST = '127.0.0.1'
@@ -48,6 +49,16 @@ app.get('/api/meta', async (_req, res) => {
     const ddl = await loadSchema()
     const tables = (ddl.match(/^CREATE TABLE/gm) ?? []).length
     res.json({ tables, model: CHAT_MODEL, database: dbLabel() })
+  } catch (err) {
+    const { status, body } = mapFault(err)
+    res.status(status).json(body)
+  }
+})
+
+// Schema-aware starter questions for the empty state (generated once, cached).
+app.get('/api/suggestions', async (_req, res) => {
+  try {
+    res.json({ suggestions: await getSuggestions(await loadSchema()) })
   } catch (err) {
     const { status, body } = mapFault(err)
     res.status(status).json(body)
@@ -108,6 +119,9 @@ await loadSchema()
 
 const server = app.listen(PORT, HOST, () => {
   console.log(`Sibyl API → http://${HOST}:${PORT}`)
+  // Warm the starter-question cache off the request path so the empty state is
+  // ready when the browser asks. Best-effort — the endpoint regenerates on demand.
+  loadSchema().then((ddl) => getSuggestions(ddl)).catch(() => {})
 })
 
 for (const sig of ['SIGINT', 'SIGTERM'] as const) {

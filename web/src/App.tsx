@@ -3,7 +3,7 @@ import { useAssistantRuntime } from '@assistant-ui/react'
 import { SibylRuntimeProvider } from './runtime'
 import { Thread } from './thread'
 import { faultBus } from './faults'
-import { getMeta } from './api'
+import { getMeta, getSuggestions } from './api'
 import { currentTheme, setTheme, type Theme } from './theme'
 import { SparkleIcon, PlusIcon, SunIcon, MoonIcon } from './components/icons'
 import type { Meta } from './types'
@@ -11,9 +11,11 @@ import type { Meta } from './types'
 export function App() {
   const [theme, setThemeState] = useState<Theme>(currentTheme)
   const [meta, setMeta] = useState<Meta | null>(null)
+  const [suggestions, setSuggestions] = useState<string[] | null>(null)
 
   useEffect(() => {
     getMeta().then(setMeta)
+    getSuggestions().then(setSuggestions)
   }, [])
 
   function toggleTheme() {
@@ -28,7 +30,7 @@ export function App() {
         <TopBar theme={theme} onToggleTheme={toggleTheme} meta={meta} />
         <FaultBanner />
         <div className="min-h-0 flex-1">
-          <Thread meta={meta} />
+          <Thread meta={meta} suggestions={suggestions} />
         </div>
       </div>
     </SibylRuntimeProvider>
