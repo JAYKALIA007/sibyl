@@ -6,10 +6,12 @@
 // explicitly: an answer, a refusal, or a give-up-after-retries error.
 
 import { getSchema, toDDL } from './introspect.ts'
-import { toSql, NO_ANSWER } from './nl2sql.ts'
+import { toSql, NO_ANSWER, type Turn } from './nl2sql.ts'
 import { guard } from './guard.ts'
 import { runQuery } from './db.ts'
 import { generate } from './ollama.ts'
+
+export type { Turn }
 
 export type AskResult =
   | { kind: 'answer'; sql: string; rows: any[]; columns: string[]; summary: string; attempts: number }
@@ -43,7 +45,10 @@ async function summarize(question: string, rows: any[], columns: string[]): Prom
   return out.trim()
 }
 
-export async function ask(question: string): Promise<AskResult> {
+// `history` is the surface's conversation buffer (prior successful turns). The core
+// itself holds NO conversation state — each surface owns and passes its own, so the
+// same core can serve many concurrent sessions (see docs/adr/0001).
+export async function ask(question: string, history: Turn[] = []): Promise<AskResult> {
   const ddl = await loadSchema()
 
   let feedback: { sql: string; error: string } | undefined
@@ -52,7 +57,7 @@ export async function ask(question: string): Promise<AskResult> {
   while (attempts < MAX_ATTEMPTS) {
     attempts++
 
-    const sql = await toSql(ddl, question, { feedback })
+    const sql = await toSql(ddl, question, { feedback, history })
     if (sql === NO_ANSWER) {
       return { kind: 'refused', reason: "That can't be answered from this database's schema." }
     }

@@ -29,6 +29,7 @@ sibyl> How many orders did each user place?
 - **Local & private** — your schema and data never leave your machine.
 - **Read-only & safe** — connects as a read-only role; the DB itself rejects writes.
 - **Self-correcting** — retries on SQL errors with the database's own error message as feedback.
+- **Conversational** — remembers the last few turns, so follow-ups like "how many did *they* order?" resolve.
 - **Measured** — an execution-accuracy eval proves the generated SQL is correct.
 
 ## Quick start
@@ -85,7 +86,11 @@ SIBYL_CHAT_MODEL=llama3.1
 ```
 
 Any model served by your local Ollama works. Larger models produce better SQL;
-the execution-accuracy eval (#9) measures the difference.
+the execution-accuracy eval measures the difference.
+
+Ollama's default context window is only 2,048 tokens; Sibyl raises it to 8,192 so
+the schema and conversation fit. Override with `SIBYL_NUM_CTX` (qwen2.5-coder
+supports up to 32,768).
 
 ## Setup (seed database + read-only role)
 
