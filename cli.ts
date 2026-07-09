@@ -8,7 +8,7 @@ import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { ask, loadSchema, type Turn } from './core.ts'
 import { runQuery, close } from './db.ts'
-import { runFirstRunWizard } from './setup.ts'
+import { runFirstRunWizard, ensureOllamaReady } from './setup.ts'
 import { c } from './colors.ts'
 
 // How many prior turns of context to carry (see docs/adr/0001).
@@ -326,6 +326,10 @@ if (!process.env.DATABASE_URL) {
   const configured = await runFirstRunWizard()
   if (!configured) process.exit(1)
 }
+
+// The other hard dependency: a local LLM via Ollama. Fail early with the exact fix
+// (and an offer to pull the model) instead of a raw fetch error on the first question.
+if (!(await ensureOllamaReady())) process.exit(1)
 
 await boot()
 await repl()
