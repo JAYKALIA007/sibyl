@@ -106,8 +106,8 @@ db-ai/
 ├── nl2sql.ts        # prompt(schemaDDL, question) → SQL; SELECT-only guard
 ├── core.ts          # THE ENGINE: nl2sql → runQuery → retry-on-error (≤3) → summarize
 │                    #   returns { sql, rows, columns, summary, attempts }
-├── cli.ts           # readline REPL → prints SQL + ASCII table + summary   (npm run cli)
-├── server.ts        # thin Express API: POST /ask → core                   (npm run web)
+├── cli.ts           # readline REPL → prints SQL + ASCII table + summary   (pnpm sibyl)
+├── server.ts        # thin Express API: POST /ask → core                   (pnpm server)
 ├── web/             # Vite + React SPA (input → SQL + data grid + summary)
 ├── evals/
 │   ├── dataset.json # [{ question, goldSQL }]  — the difficulty ladder
