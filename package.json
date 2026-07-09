@@ -11,6 +11,7 @@
     "core:check": "node --import tsx --env-file=.env core.ts",
     "sibyl": "node --import tsx --env-file=.env cli.ts",
     "eval": "node --import tsx --env-file=.env evals/run.ts",
+    "eval:multi": "node --import tsx --env-file=.env evals/run-conversations.ts",
     "test": "node --import tsx --test *.test.ts"
   },
   "license": "MIT",
