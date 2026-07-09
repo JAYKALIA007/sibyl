@@ -8,6 +8,8 @@ import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { ask, loadSchema, type Turn } from './core.ts'
 import { runQuery, close } from './db.ts'
+import { runFirstRunWizard } from './setup.ts'
+import { c } from './colors.ts'
 
 // How many prior turns of context to carry (see docs/adr/0001).
 const HISTORY_WINDOW = 3
@@ -65,24 +67,6 @@ function toCsv(columns: string[], rows: Record<string, unknown>[]): string {
   const head = columns.map(csvEscape).join(',')
   const body = rows.map((r) => columns.map((col) => csvEscape(r[col])).join(',')).join('\n')
   return `${head}\n${body}\n`
-}
-
-// ── colour / NO_COLOR support ────────────────────────────────────────────────
-// Respects the NO_COLOR env var (https://no-color.org/) and --no-color flag.
-
-const useColor =
-  output.isTTY &&
-  !process.env.NO_COLOR &&
-  !process.argv.includes('--no-color')
-
-const c = {
-  bold:    (s: string) => useColor ? `\x1b[1m${s}\x1b[0m` : s,
-  dim:     (s: string) => useColor ? `\x1b[2m${s}\x1b[0m` : s,
-  cyan:    (s: string) => useColor ? `\x1b[36m${s}\x1b[0m` : s,
-  green:   (s: string) => useColor ? `\x1b[32m${s}\x1b[0m` : s,
-  yellow:  (s: string) => useColor ? `\x1b[33m${s}\x1b[0m` : s,
-  red:     (s: string) => useColor ? `\x1b[31m${s}\x1b[0m` : s,
-  magenta: (s: string) => useColor ? `\x1b[35m${s}\x1b[0m` : s,
 }
 
 // ── spinner ───────────────────────────────────────────────────────────────────
@@ -335,6 +319,14 @@ async function repl(): Promise<void> {
 // ── entry ─────────────────────────────────────────────────────────────────────
 
 applyDbFlag()
+
+// Zero-config first run: if nothing configured the connection (no .env, empty
+// DATABASE_URL, no --db), walk the user through it instead of crashing on connect.
+if (!process.env.DATABASE_URL) {
+  const configured = await runFirstRunWizard()
+  if (!configured) process.exit(1)
+}
+
 await boot()
 await repl()
 console.log(c.dim('  bye.'))

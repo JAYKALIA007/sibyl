@@ -47,17 +47,15 @@ pnpm install
 # 2. Pull the model
 ollama pull qwen2.5-coder
 
-# 3. Point Sibyl at your database
-cp .env.example .env
-#  → open .env, fill in DATABASE_URL with a read-only (or regular) connection string
-
-# 4. (Optional) Load the bundled seed database to try it out
-#    Run the SQL in seed.sql against your Postgres instance, then point .env at it.
-#    See SETUP.md for the full read-only role setup.
-
-# 5. Start the REPL
+# 3. Start the REPL — on first run, if no database is configured, Sibyl walks you
+#    through it (asks for a URL, connects, offers to save it to .env).
 pnpm sibyl
 ```
+
+Prefer to configure it yourself? Copy `.env.example` to `.env` and fill in
+`DATABASE_URL` with a read-only (or regular) connection string — the wizard only
+fires when nothing is set. To try the bundled sample data, load `seed.sql` into your
+Postgres and point Sibyl at it; see [`SETUP.md`](./SETUP.md) for the read-only role.
 
 > **Why pnpm?** Beyond a strict, content-addressed `node_modules`, we set a
 > [`minimumReleaseAge`](https://pnpm.io/settings#minimumreleaseage) of 24h — pnpm
