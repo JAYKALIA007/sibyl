@@ -130,14 +130,35 @@ npm run db:check       # verify DB connection + read-only role
 npm run schema:ddl     # print live schema as DDL
 npm run nl2sql:check   # generate SQL for sample questions
 npm run core:check     # run sample questions end-to-end
-npm run test           # unit tests (guard + schema formatter)
-npm run sibyl            # interactive REPL
+npm run test           # unit tests (comparator + guard + schema formatter)
+npm run eval           # execution-accuracy eval (score vs gold SQL)
+npm run sibyl          # interactive REPL
+```
+
+## Measuring accuracy
+
+`npm run eval` scores generated SQL against hand-written **gold SQL** by *executing
+both and comparing the rows* — not by matching query text. The brain is swappable;
+the eval decides which brain wins:
+
+```
+Sibyl execution-accuracy eval — model: qwen2.5-coder
+  ✓  [filter] · ✓ [aggregation] · ✓ [join] · ✓ [group-by] · ✓ [ordered]
+  ✓  [anti-join] · ✓ [junction-and] · ✓ [off-schema-refusal]
+  Score: 9/9 (100%)
+```
+
+Swap the model to see the number move:
+
+```bash
+SIBYL_CHAT_MODEL=llama3.2 npm run eval    # → 7/9 (78%): misses AND-tag + ordering
 ```
 
 ## Status
 
-**8 / 9 slices done.** Remaining: execution-accuracy eval (#9).
-Tracked in [Issues](../../issues).
+**9 / 9 slices done.** Core vertical complete: schema → SQL → guard → run →
+summarize, behind a CLI, measured by an execution-accuracy eval.
+Further work tracked in [Issues](../../issues).
 
 ## License
 

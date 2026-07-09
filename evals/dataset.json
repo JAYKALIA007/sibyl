@@ -1,0 +1,57 @@
+[
+  {
+    "id": "filter-01",
+    "rung": "filter",
+    "question": "Which products cost more than 50 dollars? List their names.",
+    "goldSQL": "SELECT name FROM products WHERE price > 50"
+  },
+  {
+    "id": "aggregation-01",
+    "rung": "aggregation",
+    "question": "How many users are there?",
+    "goldSQL": "SELECT COUNT(*) AS n FROM users"
+  },
+  {
+    "id": "aggregation-02",
+    "rung": "aggregation",
+    "question": "What is the total revenue from all payments that have been paid?",
+    "goldSQL": "SELECT SUM(amount) AS total FROM payments WHERE status = 'paid'"
+  },
+  {
+    "id": "join-01",
+    "rung": "join",
+    "question": "List each order id and the name of the user who placed it.",
+    "goldSQL": "SELECT o.id, u.name FROM orders o JOIN users u ON o.user_id = u.id"
+  },
+  {
+    "id": "group-by-01",
+    "rung": "group-by",
+    "question": "How many orders did each user place? Show the user name and the order count.",
+    "goldSQL": "SELECT u.name, COUNT(o.id) AS order_count FROM users u JOIN orders o ON o.user_id = u.id GROUP BY u.name"
+  },
+  {
+    "id": "ordered-01",
+    "rung": "ordered",
+    "ordered": true,
+    "question": "List all product names ordered by price, cheapest first.",
+    "goldSQL": "SELECT name FROM products ORDER BY price ASC"
+  },
+  {
+    "id": "anti-join-01",
+    "rung": "anti-join",
+    "question": "Which users have never placed an order? List their names.",
+    "goldSQL": "SELECT name FROM users WHERE id NOT IN (SELECT user_id FROM orders)"
+  },
+  {
+    "id": "junction-and-01",
+    "rung": "junction-and",
+    "question": "Which products are tagged BOTH 'work-from-home' AND 'premium'? List their names.",
+    "goldSQL": "SELECT p.name FROM products p JOIN product_tags pt ON pt.product_id = p.id JOIN tags t ON t.id = pt.tag_id WHERE t.name IN ('work-from-home', 'premium') GROUP BY p.id, p.name HAVING COUNT(DISTINCT t.name) = 2"
+  },
+  {
+    "id": "refusal-01",
+    "rung": "off-schema-refusal",
+    "question": "Who is the current CEO of Google?",
+    "expect": "refused"
+  }
+]
