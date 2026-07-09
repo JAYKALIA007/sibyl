@@ -66,15 +66,26 @@ Point `DATABASE_URL` at any PostgreSQL database you have read access to:
 DATABASE_URL=postgresql://user:pass@host:5432/dbname?sslmode=require
 ```
 
-Sibyl introspects the schema automatically — no configuration needed.
+Sibyl introspects the schema automatically — no configuration needed. Or point at
+one for a single run without touching `.env`:
+
+```bash
+npm run sibyl -- --db postgresql://user:pass@host:5432/dbname
+```
 
 ### Built-in commands
 
-| Command   | What it does                                       |
-|-----------|---------------------------------------------------|
-| `.schema` | Print the DDL Sibyl is working from               |
-| `.clear`  | Clear the terminal                                |
-| `exit`    | Quit (also Ctrl-C)                                |
+| Command           | What it does                                    |
+|-------------------|-------------------------------------------------|
+| `.schema`         | Print the DDL Sibyl is working from             |
+| `.tables`         | List tables with row counts                     |
+| `.last`           | Re-print the last generated SQL                 |
+| `.export [file]`  | Save the last result to CSV                     |
+| `.clear`          | Clear the terminal and reset conversation memory|
+| `exit`            | Quit (also Ctrl-C / Ctrl-D)                      |
+
+Question history persists across sessions (`~/.sibyl_history`) — arrow-up recalls
+past questions.
 
 ## Model swap
 
