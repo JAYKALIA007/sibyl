@@ -1,4 +1,4 @@
-import type { AskResult, Fault, Meta, Turn } from './types'
+import type { AskResult, Fault, Meta, SchemaInfo, Turn } from './types'
 
 // Runtime-configurable so a future desktop shell (Tauri sidecar) can point the same
 // build at a dynamic port. Default '/api' is proxied to Express by Vite in dev.
@@ -40,6 +40,23 @@ export async function getMeta(): Promise<Meta | null> {
   } catch {
     return null
   }
+}
+
+// Full schema + row counts for the /schema and /tables commands. Unlike the
+// best-effort helpers above, a command is an explicit user action — surface a
+// failure as a fault (banner) rather than swallowing it.
+export async function getSchema(): Promise<SchemaInfo> {
+  let res: Response
+  try {
+    res = await fetch(`${API}/schema`)
+  } catch (e) {
+    throw new SibylFault(`network error: ${String(e)}`)
+  }
+  const body = (await res.json().catch(() => null)) as SchemaInfo | Fault | null
+  if (!res.ok || !body || 'kind' in body) {
+    throw new SibylFault(body && 'error' in body ? body.error : `server error ${res.status}`)
+  }
+  return body
 }
 
 // Schema-aware starter questions for the empty state; [] on failure.

@@ -27,3 +27,15 @@ export type Fault = { kind: 'fault'; error: string }
 
 // Status-bar metadata (server: GET /api/meta).
 export type Meta = { tables: number; model: string; database: string }
+
+// Full schema + per-table row counts (server: GET /api/schema).
+export type SchemaTable = { table: string; rows: string }
+export type SchemaInfo = { ddl: string; tables: SchemaTable[] }
+
+// Result of a slash command — rendered as an assistant message, but produced
+// client-side / from /api/schema, not by the NL→SQL engine (so it never enters the
+// model-context history buffer). '/new' is a UI action and has no result.
+export type CommandResult =
+  | { kind: 'help' }
+  | { kind: 'schema'; ddl: string; tables: SchemaTable[] }
+  | { kind: 'tables'; tables: SchemaTable[] }

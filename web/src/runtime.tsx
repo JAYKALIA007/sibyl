@@ -4,10 +4,11 @@ import {
   useLocalRuntime,
   type ChatModelAdapter,
 } from '@assistant-ui/react'
-import { ask, SibylFault } from './api'
+import { ask, getSchema, SibylFault } from './api'
 import { faultBus } from './faults'
 import { deriveHistory, type HistoryMessage } from './history'
-import type { AskResult } from './types'
+import { parseCommand } from './commands'
+import type { AskResult, CommandResult } from './types'
 
 type RunMessage = { role: string; content: readonly unknown[]; metadata?: { custom?: unknown } }
 
@@ -49,6 +50,26 @@ function fallbackText(result: AskResult): string {
   }
 }
 
+// A content slash command (/schema, /tables, /help) → its rendered result. Runs
+// client-side / off /api/schema, bypassing the NL→SQL engine. '/new' is handled in
+// the composer (a UI action), so it never reaches here.
+async function runCommand(kind: 'schema' | 'tables' | 'help'): Promise<CommandResult> {
+  if (kind === 'help') return { kind: 'help' }
+  const { ddl, tables } = await getSchema()
+  return kind === 'schema' ? { kind: 'schema', ddl, tables } : { kind: 'tables', tables }
+}
+
+function commandFallbackText(result: CommandResult): string {
+  switch (result.kind) {
+    case 'help':
+      return 'Sibyl commands'
+    case 'schema':
+      return `Schema — ${result.tables.length} table${result.tables.length === 1 ? '' : 's'}`
+    case 'tables':
+      return `${result.tables.length} table${result.tables.length === 1 ? '' : 's'}`
+  }
+}
+
 const adapter: ChatModelAdapter = {
   async run({ messages }) {
     const question = lastUserText(messages)
@@ -56,7 +77,19 @@ const adapter: ChatModelAdapter = {
     // separate from the visual thread (ADR 0001). The trailing (current) question
     // is naturally excluded (no answer follows it yet).
     const history = deriveHistory(toHistoryMessages(messages))
+    const command = parseCommand(question)
     try {
+      // Content commands short-circuit the engine and render their own message.
+      // They carry `command` (not `result`) in metadata, so deriveHistory — which
+      // only reads `result` — never folds them into the model-context buffer.
+      if (command && command.kind === 'content') {
+        const result = await runCommand(command.name.slice(1) as 'schema' | 'tables' | 'help')
+        faultBus.emit(null)
+        return {
+          content: [{ type: 'text', text: commandFallbackText(result) }],
+          metadata: { custom: { command: result } },
+        }
+      }
       const result = await ask(question, history)
       faultBus.emit(null) // a success clears any stale connection banner
       // The full result rides along in metadata.custom; the assistant message reads

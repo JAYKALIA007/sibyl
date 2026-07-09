@@ -10,7 +10,7 @@ import { existsSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { ask, loadSchema, type Turn } from './core.ts'
-import { close } from './db.ts'
+import { close, runQuery } from './db.ts'
 import { checkOllama, CHAT_MODEL, OLLAMA } from './ollama.ts'
 import { getSuggestions } from './suggestions.ts'
 import { mapResult, mapFault } from './responseMapper.ts'
@@ -49,6 +49,25 @@ app.get('/api/meta', async (_req, res) => {
     const ddl = await loadSchema()
     const tables = (ddl.match(/^CREATE TABLE/gm) ?? []).length
     res.json({ tables, model: CHAT_MODEL, database: dbLabel() })
+  } catch (err) {
+    const { status, body } = mapFault(err)
+    res.status(status).json(body)
+  }
+})
+
+// The full DDL Sibyl prompts with, plus per-table row counts — backs the GUI's
+// /schema and /tables commands (the CLI's .schema / .tables). Row counts come from
+// pg_stat (approximate, like the CLI); '?' until a table's first ANALYZE.
+app.get('/api/schema', async (_req, res) => {
+  try {
+    const ddl = await loadSchema()
+    const q = await runQuery(`
+      SELECT relname AS table,
+        CASE WHEN n_live_tup = 0 THEN '?' ELSE n_live_tup::text END AS rows
+      FROM pg_stat_user_tables
+      WHERE schemaname = 'public'
+      ORDER BY relname`)
+    res.json({ ddl, tables: 'error' in q ? [] : q.rows })
   } catch (err) {
     const { status, body } = mapFault(err)
     res.status(status).json(body)
