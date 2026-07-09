@@ -140,11 +140,28 @@ db.ts          ──→  runQuery (read-only role, 5 s timeout)
    ▼
 core.ts        ──→  retry loop (cap 3) + NL summary
    │
-   ├──→  cli.ts   (this REPL)
-   └──→  (web GUI — later)
+   ├──→  cli.ts     (the REPL)
+   └──→  server.ts  (Express API) ──→ web/ (React SPA)
 ```
 
-See [`DESIGN.md`](./DESIGN.md) for locked decisions and rationale.
+See [`DESIGN.md`](./DESIGN.md) for locked decisions and rationale, and
+[`issues/gui-prd.md`](./issues/gui-prd.md) for the web GUI plan.
+
+## Web GUI (in progress)
+
+A browser front-end over the same engine. Two processes in dev:
+
+```bash
+# terminal 1 — the API (Express over core.ask, localhost only)
+npm run server
+
+# terminal 2 — the React app (Vite dev server, proxies /api → :3001)
+npm --prefix web install   # first time
+npm --prefix web run dev   # → http://localhost:5173
+```
+
+The server is stateless; the browser owns the conversation. Point the client at a
+different API with `VITE_API_URL` (defaults to `/api`, proxied in dev).
 
 ## Development
 
