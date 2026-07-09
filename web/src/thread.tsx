@@ -8,7 +8,7 @@ import {
 import { cn } from './lib/utils'
 import { AssistantAnswer } from './AssistantAnswer'
 import { SparkleIcon, SendIcon } from './components/icons'
-import type { AskResult } from './types'
+import type { AskResult, Meta } from './types'
 
 const EXAMPLES = [
   'How many orders did each user place?',
@@ -17,7 +17,7 @@ const EXAMPLES = [
   'List the top 5 customers by amount spent.',
 ]
 
-export function Thread() {
+export function Thread({ meta }: { meta: Meta | null }) {
   return (
     <ThreadPrimitive.Root className="flex h-full flex-col bg-background">
       <ThreadPrimitive.Viewport className="flex-1 overflow-y-auto">
@@ -30,11 +30,29 @@ export function Thread() {
       </ThreadPrimitive.Viewport>
 
       <div className="border-t border-border bg-background/80 backdrop-blur">
-        <div className="mx-auto w-full max-w-3xl px-4 py-3">
+        <div className="mx-auto w-full max-w-3xl px-4 pb-3 pt-2">
+          <StatusBar meta={meta} />
           <Composer />
         </div>
       </div>
     </ThreadPrimitive.Root>
+  )
+}
+
+function StatusBar({ meta }: { meta: Meta | null }) {
+  return (
+    <div className="mb-2 flex items-center gap-1.5 px-1 text-xs text-muted-foreground">
+      <span className={cn('h-1.5 w-1.5 rounded-full', meta ? 'bg-emerald-500' : 'bg-amber-500')} />
+      {meta ? (
+        <span>
+          {meta.tables.toLocaleString('en-US')} table{meta.tables === 1 ? '' : 's'}
+          <span className="mx-1.5 opacity-50">·</span>
+          {meta.model}
+        </span>
+      ) : (
+        <span>connecting…</span>
+      )}
+    </div>
   )
 }
 

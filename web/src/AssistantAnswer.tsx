@@ -8,7 +8,7 @@ const DISPLAY_ROW_CAP = 20
 export function AssistantAnswer({ result }: { result: AskResult }) {
   if (result.kind === 'refused') {
     return (
-      <div className="flex items-start gap-2 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800">
+      <div className="flex items-start gap-2 rounded-md bg-amber-500/10 px-3 py-2 text-sm text-amber-700 dark:text-amber-400">
         <span aria-hidden className="mt-px">⚠</span>
         <p>{result.reason}</p>
       </div>

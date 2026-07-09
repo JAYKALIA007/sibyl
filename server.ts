@@ -11,7 +11,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { ask, loadSchema, type Turn } from './core.ts'
 import { close } from './db.ts'
-import { checkOllama, OLLAMA } from './ollama.ts'
+import { checkOllama, CHAT_MODEL, OLLAMA } from './ollama.ts'
 import { mapResult, mapFault } from './responseMapper.ts'
 
 const HOST = '127.0.0.1'
@@ -29,6 +29,29 @@ app.use(express.json())
 
 app.get('/api/health', (_req, res) => {
   res.json({ ok: true })
+})
+
+// A password-free label for the connected database (user@host/db) for the UI's
+// status bar — never the raw connection string.
+function dbLabel(): string {
+  try {
+    const u = new URL(process.env.DATABASE_URL ?? '')
+    return `${u.username}@${u.hostname}/${u.pathname.replace(/^\//, '') || 'postgres'}`
+  } catch {
+    return ''
+  }
+}
+
+// Lightweight metadata for the status bar: table count, active model, DB label.
+app.get('/api/meta', async (_req, res) => {
+  try {
+    const ddl = await loadSchema()
+    const tables = (ddl.match(/^CREATE TABLE/gm) ?? []).length
+    res.json({ tables, model: CHAT_MODEL, database: dbLabel() })
+  } catch (err) {
+    const { status, body } = mapFault(err)
+    res.status(status).json(body)
+  }
 })
 
 app.post('/api/ask', async (req, res) => {
