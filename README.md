@@ -34,8 +34,12 @@ sibyl> How many orders did each user place?
 
 ## Install
 
-**Prerequisites:** [Ollama](https://ollama.com) running locally with `qwen2.5-coder`
-pulled (`ollama pull qwen2.5-coder`), and a PostgreSQL database you can connect to.
+**Prerequisites** (Sibyl talks to these — `npx sibyl-cli` installs the CLI only, not
+these):
+
+1. [**Ollama**](https://ollama.com) installed and running — it's a separate local
+   service Sibyl calls at `localhost:11434`. Pull the model once: `ollama pull qwen2.5-coder`.
+2. A **PostgreSQL** database you can connect to.
 
 ```bash
 npx sibyl-cli            # run without installing
@@ -74,18 +78,48 @@ Postgres and point Sibyl at it; see [`SETUP.md`](./SETUP.md) for the read-only r
 
 ### Using your own database
 
-Point `DATABASE_URL` at any PostgreSQL database you have read access to:
+Sibyl introspects the schema automatically — point it at any PostgreSQL database you
+have read access to. For a database that holds **real data**, connect as a
+**read-only role**: that's the safety wall, so even a mistaken write is rejected by
+the database itself (Sibyl also refuses non-`SELECT` SQL, but defense in depth wins).
+
+> ⚠️ Don't run `seed.sql` against a database you care about — it's sample data for a
+> fresh/throwaway DB, not something to load into an existing one.
+
+**Create a read-only role** (run once in your SQL editor — this only adds a login, it
+does not modify any data):
+
+```sql
+CREATE ROLE sibyl_ro LOGIN PASSWORD 'pick-a-strong-password';
+GRANT CONNECT ON DATABASE postgres TO sibyl_ro;
+GRANT USAGE  ON SCHEMA public       TO sibyl_ro;
+GRANT SELECT ON ALL TABLES IN SCHEMA public TO sibyl_ro;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO sibyl_ro;
+```
+
+Verify it really is read-only — this must **fail** with a permission error:
+
+```sql
+SET ROLE sibyl_ro;
+DELETE FROM <any-table> WHERE false;   -- expected: permission denied
+RESET ROLE;
+```
+
+Then point Sibyl at it, either via `.env`:
 
 ```
-DATABASE_URL=postgresql://user:pass@host:5432/dbname?sslmode=require
+DATABASE_URL=postgresql://sibyl_ro:PASSWORD@host:5432/dbname?sslmode=require
 ```
 
-Sibyl introspects the schema automatically — no configuration needed. Or point at
-one for a single run without touching `.env`:
+…or for a single run without touching `.env`:
 
 ```bash
-pnpm sibyl --db postgresql://user:pass@host:5432/dbname
+npx sibyl-cli --db "postgresql://sibyl_ro:PASSWORD@host:5432/dbname?sslmode=require"
 ```
+
+On Supabase, find the host under **Project Settings → Database → Connection string →
+Direct connection** (port **5432**, not the 6543 pooler); SSL is required. See
+[`SETUP.md`](./SETUP.md) for the full walkthrough.
 
 ### Built-in commands
 
