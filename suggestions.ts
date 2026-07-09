@@ -47,15 +47,19 @@ export function fallbackSuggestions(ddl: string): string[] {
   return tables.map((t) => `How many rows are in the ${t} table?`)
 }
 
-let cache: string[] | null = null
-let inflight: Promise<string[]> | null = null
+// Cached per connection (`key`) — with multiple saved DBs, a single global cache
+// would serve the first database's questions for every other one. Concurrent
+// callers for the same key share the one in-flight request.
+const cache = new Map<string, string[]>()
+const inflight = new Map<string, Promise<string[]>>()
 
-// Generate once per process (the schema is fixed for a session) and cache it;
-// concurrent callers share the one in-flight request.
-export async function getSuggestions(ddl: string): Promise<string[]> {
-  if (cache) return cache
-  if (!inflight) {
-    inflight = (async () => {
+export async function getSuggestions(ddl: string, key = '__env__'): Promise<string[]> {
+  const cached = cache.get(key)
+  if (cached) return cached
+
+  let pending = inflight.get(key)
+  if (!pending) {
+    pending = (async () => {
       try {
         const raw = await generate(ddl, { system: SYSTEM, temperature: 0.5 })
         const qs = parseSuggestions(raw)
@@ -64,10 +68,11 @@ export async function getSuggestions(ddl: string): Promise<string[]> {
         return fallbackSuggestions(ddl)
       }
     })().then((r) => {
-      cache = r
-      inflight = null
+      cache.set(key, r)
+      inflight.delete(key)
       return r
     })
+    inflight.set(key, pending)
   }
-  return inflight
+  return pending
 }

@@ -28,6 +28,10 @@ export type Fault = { kind: 'fault'; error: string }
 // Status-bar metadata (server: GET /api/meta).
 export type Meta = { tables: number; model: string; database: string }
 
+// A saved connection as the client sees it — never the raw URL (server: the
+// connection registry). `label` is the password-free user@host/db.
+export type ConnectionView = { id: string; name: string; label: string }
+
 // Full schema + per-table row counts (server: GET /api/schema).
 export type SchemaTable = { table: string; rows: string }
 export type SchemaInfo = { ddl: string; tables: SchemaTable[] }
