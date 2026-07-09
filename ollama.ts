@@ -10,6 +10,12 @@ const OLLAMA = process.env.OLLAMA_HOST || 'http://localhost:11434'
 export const CHAT_MODEL = process.env.SIBYL_CHAT_MODEL || 'qwen2.5-coder'
 export const EMBED_MODEL = process.env.SIBYL_EMBED_MODEL || 'nomic-embed-text'
 
+// Ollama's runtime default context window is only 2048 tokens, regardless of what
+// the model actually supports (qwen2.5-coder → 32768). Without setting num_ctx we'd
+// silently run at 1/16th of the real window — the schema DDL alone can approach the
+// 2048 default. Set it explicitly; override with SIBYL_NUM_CTX.
+export const NUM_CTX = Number(process.env.SIBYL_NUM_CTX) || 8192
+
 type GenerateOptions = {
   temperature?: number // 0 = deterministic (used by the eval)
   system?: string
@@ -25,7 +31,10 @@ export async function generate(prompt: string, opts: GenerateOptions = {}): Prom
       prompt,
       system: opts.system,
       stream: false,
-      options: opts.temperature === undefined ? undefined : { temperature: opts.temperature },
+      options: {
+        num_ctx: NUM_CTX,
+        ...(opts.temperature === undefined ? {} : { temperature: opts.temperature }),
+      },
     }),
   })
   if (!res.ok) throw new Error(`generate failed: ${res.status} ${await res.text()}`)

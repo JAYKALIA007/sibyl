@@ -3,8 +3,11 @@
 
 import * as readline from 'node:readline/promises'
 import { stdin as input, stdout as output } from 'node:process'
-import { ask, loadSchema } from './core.ts'
+import { ask, loadSchema, type Turn } from './core.ts'
 import { runQuery, close } from './db.ts'
+
+// How many prior turns of context to carry (see docs/adr/0001).
+const HISTORY_WINDOW = 3
 
 // ── colour / NO_COLOR support ────────────────────────────────────────────────
 // Respects the NO_COLOR env var (https://no-color.org/) and --no-color flag.
@@ -92,10 +95,11 @@ const HELP = `
   ${c.cyan('.help')}      show this message
   ${c.cyan('.schema')}    print the full DDL Sibyl is working from
   ${c.cyan('.tables')}    list tables with row counts
-  ${c.cyan('.clear')}     clear the terminal
+  ${c.cyan('.clear')}     clear the terminal and reset conversation memory
   ${c.cyan('exit')}       quit  (also Ctrl-C / Ctrl-D)
 
   ${c.bold('Anything else')} is treated as a natural-language question.
+  Follow-ups remember the last ${HISTORY_WINDOW} turns — ask "how many did they order?"
 `
 
 // ── boot ──────────────────────────────────────────────────────────────────────
@@ -123,6 +127,9 @@ async function repl(): Promise<void> {
   const rl = readline.createInterface({ input, output, terminal: output.isTTY })
   const prompt = c.bold(c.magenta('sibyl> '))
 
+  // The CLI owns the conversation buffer; the core stays stateless (ADR 0001).
+  let history: Turn[] = []
+
   while (true) {
     let question: string
     try {
@@ -146,6 +153,7 @@ async function repl(): Promise<void> {
 
     if (question === '.clear') {
       process.stdout.write('\x1bc')
+      history = [] // same gesture wipes the screen and the conversation
       continue
     }
 
@@ -179,7 +187,7 @@ async function repl(): Promise<void> {
     // ── NL → SQL → run ────────────────────────────────────────────────────────
     const t0 = Date.now()
     const stopSpinner = startSpinner('Thinking…')
-    const result = await ask(question)
+    const result = await ask(question, history)
     stopSpinner()
     const elapsed = ((Date.now() - t0) / 1000).toFixed(1)
 
@@ -207,6 +215,9 @@ async function repl(): Promise<void> {
       c.dim(` (${elapsed}s, ${result.rows.length} row${result.rows.length === 1 ? '' : 's'})`)
     )
     console.log()
+
+    // Only successful turns graduate into history (ADR 0001); keep the last N.
+    history = [...history, { question, sql: result.sql }].slice(-HISTORY_WINDOW)
   }
 }
 

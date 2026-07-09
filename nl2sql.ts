@@ -19,10 +19,28 @@ const SYSTEM = [
 
 type Feedback = { sql: string; error: string }
 
-function buildPrompt(ddl: string, question: string, feedback?: Feedback): string {
-  let p = `Schema:\n${ddl}\n\nQuestion: ${question}`
-  if (feedback) {
-    p += `\n\nYour previous query failed — fix it.\nPrevious SQL: ${feedback.sql}\nError: ${feedback.error}`
+// One prior question/answer exchange, threaded back so follow-ups resolve
+// ("how many did THEY order?"). Only the SQL is kept — it precisely encodes the
+// entities and filters the follow-up refers to (see docs/adr/0001).
+export type Turn = { question: string; sql: string }
+
+export function buildPrompt(
+  ddl: string,
+  question: string,
+  opts: { feedback?: Feedback; history?: Turn[] } = {}
+): string {
+  let p = `Schema:\n${ddl}`
+
+  const history = opts.history ?? []
+  if (history.length > 0) {
+    const lines = history.map((t) => `Q: ${t.question}\nSQL: ${t.sql}`).join('\n')
+    p += `\n\nEarlier in this conversation:\n${lines}`
+  }
+
+  p += `\n\nQuestion: ${question}`
+
+  if (opts.feedback) {
+    p += `\n\nYour previous query failed — fix it.\nPrevious SQL: ${opts.feedback.sql}\nError: ${opts.feedback.error}`
   }
   return `${p}\n\nSQL:`
 }
@@ -37,12 +55,12 @@ function extractSql(raw: string): string {
 export async function toSql(
   ddl: string,
   question: string,
-  opts: { temperature?: number; feedback?: Feedback } = {}
+  opts: { temperature?: number; feedback?: Feedback; history?: Turn[] } = {}
 ): Promise<string> {
-  const raw = await generate(buildPrompt(ddl, question, opts.feedback), {
-    temperature: opts.temperature ?? 0,
-    system: SYSTEM,
-  })
+  const raw = await generate(
+    buildPrompt(ddl, question, { feedback: opts.feedback, history: opts.history }),
+    { temperature: opts.temperature ?? 0, system: SYSTEM }
+  )
   return extractSql(raw)
 }
 
