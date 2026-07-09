@@ -10,20 +10,13 @@ import { AssistantAnswer } from './AssistantAnswer'
 import { SparkleIcon, SendIcon } from './components/icons'
 import type { AskResult, Meta } from './types'
 
-const EXAMPLES = [
-  'How many orders did each user place?',
-  'Which products have never been reviewed?',
-  'What is total revenue by product category?',
-  'List the top 5 customers by amount spent.',
-]
-
-export function Thread({ meta }: { meta: Meta | null }) {
+export function Thread({ meta, suggestions }: { meta: Meta | null; suggestions: string[] | null }) {
   return (
     <ThreadPrimitive.Root className="flex h-full flex-col bg-background">
       <ThreadPrimitive.Viewport className="flex-1 overflow-y-auto">
         <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-4 py-6">
           <ThreadPrimitive.Empty>
-            <EmptyState />
+            <EmptyState suggestions={suggestions} />
           </ThreadPrimitive.Empty>
           <ThreadPrimitive.Messages components={{ UserMessage, AssistantMessage }} />
         </div>
@@ -56,7 +49,7 @@ function StatusBar({ meta }: { meta: Meta | null }) {
   )
 }
 
-function EmptyState() {
+function EmptyState({ suggestions }: { suggestions: string[] | null }) {
   return (
     <div className="flex flex-col items-center gap-3 py-16 text-center">
       <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary text-primary-foreground">
@@ -69,19 +62,24 @@ function EmptyState() {
         </p>
       </div>
       <div className="mt-2 grid w-full max-w-lg grid-cols-1 gap-2 sm:grid-cols-2">
-        {EXAMPLES.map((q) => (
-          <ThreadPrimitive.Suggestion
-            key={q}
-            prompt={q}
-            send
-            className={cn(
-              'rounded-lg border border-border bg-card px-3 py-2 text-left text-sm text-foreground/90',
-              'transition-colors hover:border-foreground/20 hover:bg-muted',
-            )}
-          >
-            {q}
-          </ThreadPrimitive.Suggestion>
-        ))}
+        {suggestions === null
+          ? // loading: schema-aware questions are being generated
+            Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="h-[52px] animate-pulse rounded-lg border border-border bg-muted/40" />
+            ))
+          : suggestions.map((q) => (
+              <ThreadPrimitive.Suggestion
+                key={q}
+                prompt={q}
+                send
+                className={cn(
+                  'rounded-lg border border-border bg-card px-3 py-2 text-left text-sm text-foreground/90',
+                  'transition-colors hover:border-foreground/20 hover:bg-muted',
+                )}
+              >
+                {q}
+              </ThreadPrimitive.Suggestion>
+            ))}
       </div>
     </div>
   )
