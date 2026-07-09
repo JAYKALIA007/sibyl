@@ -75,37 +75,13 @@ first:
 > home). Point at a database for a single run without any file via
 > `sibyl --db "postgresql://…"`.
 
-## Quick start (from source)
-
-For development, or to run the evals and the web app:
-
-```bash
-# 1. Clone + install  (one pnpm workspace covers the engine and the web/ app)
-git clone https://github.com/JAYKALIA007/sibyl.git
-cd sibyl
-pnpm install             # needs pnpm — `corepack enable` ships it with Node ≥ 16
-
-# 2. Pull the model, then start the REPL
-ollama pull qwen2.5-coder
-pnpm sibyl
-```
-
-Prefer to configure it yourself? Copy `.env.example` to `.env` and fill in
-`DATABASE_URL` with a read-only (or regular) connection string — the wizard only
-fires when nothing is set. To try the bundled sample data, load `seed.sql` into your
-Postgres and point Sibyl at it; see [`SETUP.md`](./SETUP.md) for the read-only role.
-
-> **Why pnpm?** Beyond a strict, content-addressed `node_modules`, we set a
-> [`minimumReleaseAge`](https://pnpm.io/settings#minimumreleaseage) of 24h — pnpm
-> refuses any dependency version published less than a day ago, so the typical
-> npm-supply-chain compromise (malicious versions yanked within hours) never lands.
-
-### Using your own database
+## Connecting a database
 
 Sibyl introspects the schema automatically — point it at any PostgreSQL database you
-have read access to. For a database that holds **real data**, connect as a
-**read-only role**: that's the safety wall, so even a mistaken write is rejected by
-the database itself (Sibyl also refuses non-`SELECT` SQL, but defense in depth wins).
+have read access to, via the first-run wizard, a `DATABASE_URL` in `.env`, or the
+`--db` flag. For a database that holds **real data**, connect as a **read-only role**:
+that's the safety wall, so even a mistaken write is rejected by the database itself
+(Sibyl also refuses non-`SELECT` SQL, but defense in depth wins).
 
 > ⚠️ Don't run `seed.sql` against a database you care about — it's sample data for a
 > fresh/throwaway DB, not something to load into an existing one.
@@ -129,7 +105,8 @@ DELETE FROM <any-table> WHERE false;   -- expected: permission denied
 RESET ROLE;
 ```
 
-Then point Sibyl at it, either via `.env`:
+Then point Sibyl at it — the first-run wizard prompts for it, or set it yourself in
+`.env`:
 
 ```
 DATABASE_URL=postgresql://sibyl_ro:PASSWORD@host:5432/dbname?sslmode=require
@@ -143,9 +120,10 @@ npx sibyl-cli --db "postgresql://sibyl_ro:PASSWORD@host:5432/dbname?sslmode=requ
 
 On Supabase, find the host under **Project Settings → Database → Connection string →
 Direct connection** (port **5432**, not the 6543 pooler); SSL is required. See
-[`SETUP.md`](./SETUP.md) for the full walkthrough.
+[`SETUP.md`](./SETUP.md) for the full walkthrough, including the bundled `seed.sql`
+sample database.
 
-### Built-in commands
+## Built-in commands
 
 | Command           | What it does                                    |
 |-------------------|-------------------------------------------------|
@@ -158,6 +136,30 @@ Direct connection** (port **5432**, not the 6543 pooler); SSL is required. See
 
 Question history persists across sessions (`~/.sibyl_history`) — arrow-up recalls
 past questions.
+
+## Quick start (from source)
+
+For development, or to run the evals and the web app:
+
+```bash
+# 1. Clone + install  (one pnpm workspace covers the engine and the web/ app)
+git clone https://github.com/JAYKALIA007/sibyl.git
+cd sibyl
+pnpm install             # needs pnpm — `corepack enable` ships it with Node ≥ 16
+
+# 2. Pull the model, then start the REPL
+ollama pull qwen2.5-coder
+pnpm sibyl
+```
+
+The from-source REPL reads `.env` in the repo root — copy `.env.example` and fill in
+`DATABASE_URL`, or let the first-run wizard create it. See
+[Connecting a database](#connecting-a-database) for the read-only role.
+
+> **Why pnpm?** Beyond a strict, content-addressed `node_modules`, we set a
+> [`minimumReleaseAge`](https://pnpm.io/settings#minimumreleaseage) of 24h — pnpm
+> refuses any dependency version published less than a day ago, so the typical
+> npm-supply-chain compromise (malicious versions yanked within hours) never lands.
 
 ## Model swap
 
