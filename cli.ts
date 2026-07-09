@@ -3,11 +3,69 @@
 
 import * as readline from 'node:readline/promises'
 import { stdin as input, stdout as output } from 'node:process'
+import { readFileSync, writeFileSync } from 'node:fs'
+import { homedir } from 'node:os'
+import { join } from 'node:path'
 import { ask, loadSchema, type Turn } from './core.ts'
 import { runQuery, close } from './db.ts'
 
 // How many prior turns of context to carry (see docs/adr/0001).
 const HISTORY_WINDOW = 3
+
+// Persistent line history — arrow-up recalls questions from past sessions too.
+const HISTORY_FILE = join(homedir(), '.sibyl_history')
+const HISTORY_MAX = 500
+
+// ── CLI flags ──────────────────────────────────────────────────────────────────
+// --db <url> overrides DATABASE_URL for this run without editing .env. Applied
+// before anything touches the (lazy) pool, so the override is in place on connect.
+function applyDbFlag(): void {
+  const i = process.argv.indexOf('--db')
+  if (i === -1) return
+  const url = process.argv[i + 1]
+  if (!url || url.startsWith('--')) {
+    console.error('  --db requires a connection URL, e.g. --db postgresql://user:pass@host:5432/db')
+    process.exit(1)
+  }
+  try {
+    new URL(url)
+  } catch {
+    console.error(`  --db: not a valid URL: ${url}`)
+    process.exit(1)
+  }
+  process.env.DATABASE_URL = url
+}
+
+// ── persistent history helpers ──────────────────────────────────────────────────
+function loadPersistedHistory(): string[] {
+  try {
+    return readFileSync(HISTORY_FILE, 'utf8').split('\n').filter(Boolean)
+  } catch {
+    return [] // no file yet, or unreadable — start empty
+  }
+}
+
+function persistQuestion(list: string[], question: string): void {
+  list.push(question)
+  if (list.length > HISTORY_MAX) list.splice(0, list.length - HISTORY_MAX)
+  try {
+    writeFileSync(HISTORY_FILE, list.join('\n') + '\n')
+  } catch {
+    // best-effort; a read-only HOME shouldn't crash the REPL
+  }
+}
+
+// ── CSV export helpers ──────────────────────────────────────────────────────────
+function csvEscape(v: unknown): string {
+  const s = v === null || v === undefined ? '' : String(v)
+  return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
+}
+
+function toCsv(columns: string[], rows: Record<string, unknown>[]): string {
+  const head = columns.map(csvEscape).join(',')
+  const body = rows.map((r) => columns.map((col) => csvEscape(r[col])).join(',')).join('\n')
+  return `${head}\n${body}\n`
+}
 
 // ── colour / NO_COLOR support ────────────────────────────────────────────────
 // Respects the NO_COLOR env var (https://no-color.org/) and --no-color flag.
@@ -106,14 +164,17 @@ function parseConnInfo(raw: string): string {
 
 const HELP = `
   ${c.bold('Commands')}
-  ${c.cyan('.help')}      show this message
-  ${c.cyan('.schema')}    print the full DDL Sibyl is working from
-  ${c.cyan('.tables')}    list tables with row counts
-  ${c.cyan('.clear')}     clear the terminal and reset conversation memory
-  ${c.cyan('exit')}       quit  (also Ctrl-C / Ctrl-D)
+  ${c.cyan('.help')}            show this message
+  ${c.cyan('.schema')}          print the full DDL Sibyl is working from
+  ${c.cyan('.tables')}          list tables with row counts
+  ${c.cyan('.last')}            re-print the last generated SQL
+  ${c.cyan('.export')} [file]   save the last result to CSV
+  ${c.cyan('.clear')}           clear the terminal and reset conversation memory
+  ${c.cyan('exit')}             quit  (also Ctrl-C / Ctrl-D)
 
   ${c.bold('Anything else')} is treated as a natural-language question.
   Follow-ups remember the last ${HISTORY_WINDOW} turns — ask "how many did they order?"
+  ${c.dim('Launch with --db <url> to point at another database for one run.')}
 `
 
 // ── boot ──────────────────────────────────────────────────────────────────────
@@ -141,8 +202,17 @@ async function repl(): Promise<void> {
   const rl = readline.createInterface({ input, output, terminal: output.isTTY })
   const prompt = c.bold(c.magenta('sibyl> '))
 
+  // Preload persisted line history so arrow-up recalls past sessions. readline's
+  // in-memory history is most-recent-first, the file is oldest-first.
+  const persisted = loadPersistedHistory()
+  if (persisted.length) (rl as unknown as { history: string[] }).history = [...persisted].reverse()
+
   // The CLI owns the conversation buffer; the core stays stateless (ADR 0001).
   let history: Turn[] = []
+
+  // For .last / .export — the most recent successful query and its result.
+  let lastSql: string | null = null
+  let lastResult: { columns: string[]; rows: Record<string, unknown>[] } | null = null
 
   while (true) {
     let question: string
@@ -168,6 +238,27 @@ async function repl(): Promise<void> {
     if (question === '.clear') {
       process.stdout.write('\x1bc')
       history = [] // same gesture wipes the screen and the conversation
+      continue
+    }
+
+    if (question === '.last') {
+      console.log('\n' + (lastSql ? c.dim(lastSql) : c.dim('(no previous query)')) + '\n')
+      continue
+    }
+
+    if (question === '.export' || question.startsWith('.export ')) {
+      if (!lastResult) {
+        console.log(c.dim('  (no result to export)\n'))
+        continue
+      }
+      const arg = question.slice('.export'.length).trim()
+      const file = arg || `sibyl-export-${Date.now()}.csv`
+      try {
+        writeFileSync(file, toCsv(lastResult.columns, lastResult.rows))
+        console.log(c.green(`  ✓`) + ` saved ${lastResult.rows.length} row${lastResult.rows.length === 1 ? '' : 's'} to ${file}\n`)
+      } catch (e) {
+        console.log(c.red(`  ✗  could not write ${file}: ${(e as Error).message}\n`))
+      }
       continue
     }
 
@@ -231,6 +322,11 @@ async function repl(): Promise<void> {
     console.log(formatMeter(result.usage))
     console.log()
 
+    // Remember for .last / .export, and persist the question for cross-session recall.
+    lastSql = result.sql
+    lastResult = { columns: result.columns, rows: result.rows }
+    persistQuestion(persisted, question)
+
     // Only successful turns graduate into history (ADR 0001); keep the last N.
     history = [...history, { question, sql: result.sql }].slice(-HISTORY_WINDOW)
   }
@@ -238,6 +334,7 @@ async function repl(): Promise<void> {
 
 // ── entry ─────────────────────────────────────────────────────────────────────
 
+applyDbFlag()
 await boot()
 await repl()
 console.log(c.dim('  bye.'))
