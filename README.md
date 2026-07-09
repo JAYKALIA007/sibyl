@@ -32,23 +32,33 @@ sibyl> How many orders did each user place?
 - **Conversational** — remembers the last few turns, so follow-ups like "how many did *they* order?" resolve.
 - **Measured** — an execution-accuracy eval proves the generated SQL is correct.
 
-## Quick start
+## Install
 
-**Prerequisites:** [Ollama](https://ollama.com) running locally with `qwen2.5-coder` pulled,
-a PostgreSQL database you can connect to, and [pnpm](https://pnpm.io) (`corepack enable`
-ships it with Node ≥ 16).
+**Prerequisites:** [Ollama](https://ollama.com) running locally with `qwen2.5-coder`
+pulled (`ollama pull qwen2.5-coder`), and a PostgreSQL database you can connect to.
+
+```bash
+npx sibyl-cli            # run without installing
+# or install the `sibyl` command globally:
+npm i -g sibyl-cli       # then just: sibyl
+```
+
+The package publishes as `sibyl-cli`; the command it installs is **`sibyl`**. On first
+run, if no database is configured, Sibyl walks you through it — asks for a Postgres
+URL, connects, and offers to save it. Launch the web GUI with `sibyl serve`.
+
+## Quick start (from source)
+
+For development, or to run the evals and the web app:
 
 ```bash
 # 1. Clone + install  (one pnpm workspace covers the engine and the web/ app)
 git clone https://github.com/JAYKALIA007/sibyl.git
 cd sibyl
-pnpm install
+pnpm install             # needs pnpm — `corepack enable` ships it with Node ≥ 16
 
-# 2. Pull the model
+# 2. Pull the model, then start the REPL
 ollama pull qwen2.5-coder
-
-# 3. Start the REPL — on first run, if no database is configured, Sibyl walks you
-#    through it (asks for a URL, connects, offers to save it to .env).
 pnpm sibyl
 ```
 

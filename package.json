@@ -1,8 +1,34 @@
 {
-  "name": "sibyl",
+  "name": "sibyl-cli",
   "version": "0.1.0",
   "description": "Ask your database in plain English — a from-scratch, local-first natural-language-to-SQL tool.",
   "type": "module",
+  "bin": {
+    "sibyl": "dist/sibyl.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=20.12.0"
+  },
+  "keywords": [
+    "sql",
+    "postgres",
+    "natural-language",
+    "text-to-sql",
+    "cli",
+    "ollama",
+    "local-first"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/JAYKALIA007/sibyl.git"
+  },
+  "homepage": "https://github.com/JAYKALIA007/sibyl#readme",
+  "bugs": {
+    "url": "https://github.com/JAYKALIA007/sibyl/issues"
+  },
   "scripts": {
     "ollama:check": "tsx ollama.ts",
     "db:check": "node --import tsx --env-file-if-exists=.env db.ts",
@@ -14,7 +40,9 @@
     "eval:multi": "node --import tsx --env-file-if-exists=.env evals/run-conversations.ts",
     "server": "node --import tsx --env-file-if-exists=.env server.ts",
     "web:build": "pnpm --filter sibyl-web build",
+    "build:cli": "tsup && node scripts/copy-web-dist.mjs",
     "start": "pnpm run web:build && pnpm run server",
+    "prepublishOnly": "pnpm run web:build && pnpm run build:cli",
     "test": "node --import tsx --test *.test.ts"
   },
   "license": "MIT",
@@ -22,11 +50,12 @@
   "devDependencies": {
     "@types/express": "^4.17.25",
     "@types/node": "^22.10.0",
+    "@types/pg": "^8.20.0",
+    "tsup": "^8.5.1",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2"
   },
   "dependencies": {
-    "@types/pg": "^8.20.0",
     "express": "^4.22.2",
     "pg": "^8.22.0"
   }
