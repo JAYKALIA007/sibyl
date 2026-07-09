@@ -158,8 +158,7 @@ core.ts        ──→  retry loop (cap 3) + NL summary
    └──→  server.ts  (Express API) ──→ web/ (React SPA)
 ```
 
-See [`DESIGN.md`](./DESIGN.md) for locked decisions and rationale, and
-[`issues/gui-prd.md`](./issues/gui-prd.md) for the web GUI plan.
+See [`DESIGN.md`](./DESIGN.md) for the locked decisions and rationale.
 
 ## Web GUI
 
@@ -234,9 +233,10 @@ Memory controls:  4/4 referential steps confirmed history-dependent
 
 ## Status
 
-**9 / 9 slices done.** Core vertical complete: schema → SQL → guard → run →
-summarize, behind a CLI, measured by an execution-accuracy eval.
-Further work tracked in [Issues](../../issues).
+The core is complete and usable end-to-end: schema → SQL → guard → run → summarize,
+behind both a CLI and a web GUI, measured by an execution-accuracy eval. Published as
+[`sibyl-cli`](https://www.npmjs.com/package/sibyl-cli). Planned work is tracked in
+[Issues](../../issues).
 
 ## License
 
