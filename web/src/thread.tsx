@@ -1,7 +1,6 @@
 import {
   ThreadPrimitive,
   MessagePrimitive,
-  MessagePartPrimitive,
   ComposerPrimitive,
   useThread,
   useMessage,
@@ -55,24 +54,23 @@ function AssistantMessage() {
   const result = useMessage(
     (m) => (m.metadata.custom as { result?: AskResult } | undefined)?.result,
   )
+  const isRunning = useMessage((m) => m.status?.type === 'running')
+
+  // A finished assistant turn with no result means the run threw a fault — that's
+  // handled by the top-level connection banner, so render no chat bubble for it
+  // (never conflate an outage with a message).
+  if (!result && !isRunning) return null
+
   return (
     <MessagePrimitive.Root className="flex justify-start">
       <div className="w-full rounded-lg border border-border bg-card px-4 py-3">
         {result ? (
           <AssistantAnswer result={result} />
         ) : (
-          <MessagePrimitive.Parts components={{ Text: AssistantText }} />
+          <p className="text-sm text-muted-foreground">Thinking…</p>
         )}
       </div>
     </MessagePrimitive.Root>
-  )
-}
-
-function AssistantText() {
-  return (
-    <div className="whitespace-pre-wrap font-mono text-sm leading-relaxed">
-      <MessagePartPrimitive.Text />
-    </div>
   )
 }
 
