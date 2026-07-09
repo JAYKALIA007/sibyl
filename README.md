@@ -147,9 +147,17 @@ core.ts        ──→  retry loop (cap 3) + NL summary
 See [`DESIGN.md`](./DESIGN.md) for locked decisions and rationale, and
 [`issues/gui-prd.md`](./issues/gui-prd.md) for the web GUI plan.
 
-## Web GUI (in progress)
+## Web GUI
 
-A browser front-end over the same engine. Two processes in dev:
+A browser front-end (React + shadcn + assistant-ui) over the same engine.
+
+**Run it (one process):**
+
+```bash
+npm run start     # builds web/ and serves the app + API at http://127.0.0.1:3001
+```
+
+**Develop it (two processes, hot reload):**
 
 ```bash
 # terminal 1 — the API (Express over core.ask, localhost only)
@@ -160,8 +168,10 @@ npm --prefix web install   # first time
 npm --prefix web run dev   # → http://localhost:5173
 ```
 
-The server is stateless; the browser owns the conversation. Point the client at a
-different API with `VITE_API_URL` (defaults to `/api`, proxied in dev).
+The server is stateless and loopback-bound; the browser owns the conversation.
+Point the client at a different API with `VITE_API_URL` (defaults to `/api`,
+proxied in dev). `SIBYL_SERVE_STATIC=false` runs the API alone — handy for a future
+desktop shell that serves its own assets.
 
 ## Development
 
