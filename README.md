@@ -185,13 +185,6 @@ in the prompt":
 ctx 1,009 / 8,192 (12%)  ·  out 30
 ```
 
-## Setup (seed database + read-only role)
-
-See [`SETUP.md`](./SETUP.md) for the full walkthrough:
-1. Load `seed.sql` into Postgres (creates `users`, `products`, `orders`, `reviews`).
-2. Create a `sibyl_ro` read-only role.
-3. Add the connection string to `.env`.
-
 ## Architecture
 
 One core engine (`core.ts`) behind a CLI surface today and a web GUI later:
