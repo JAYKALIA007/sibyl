@@ -6,7 +6,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "node --import tsx --test src/history.test.ts"
+    "test": "node --import tsx --test 'src/*.test.ts'"
   },
   "dependencies": {
     "@assistant-ui/react": "^0.14.26",
