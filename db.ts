@@ -8,6 +8,26 @@ const { Pool } = pg
 
 let pool: pg.Pool | null = null
 
+// Build the pg pool options from a connection URL. Shared by the long-lived pool
+// and the throwaway probe so both connect identically (SSL, timeouts).
+function poolConfig(rawUrl: string, overrides: Partial<pg.PoolConfig> = {}): pg.PoolConfig {
+  // Strip sslmode: newer pg treats sslmode=require as verify-full, which rejects
+  // Supabase's cert chain. We want encryption without CA verification.
+  const url = new URL(rawUrl)
+  url.searchParams.delete('sslmode')
+  const connectionString = url.toString()
+  const isLocal = /@(localhost|127\.0\.0\.1)/.test(connectionString)
+
+  return {
+    connectionString,
+    ssl: isLocal ? false : { rejectUnauthorized: false }, // encrypt, don't verify CA
+    statement_timeout: 5000, // ms — kills a runaway/cartesian query
+    connectionTimeoutMillis: 10000,
+    max: 3,
+    ...overrides,
+  }
+}
+
 // Lazily create the pool on first use — importing this module has NO side effects,
 // so pure consumers (e.g. the DDL formatter and its tests) can import transitively
 // without needing DATABASE_URL set.
@@ -17,21 +37,28 @@ function getPool(): pg.Pool {
   if (!DATABASE_URL) {
     throw new Error('DATABASE_URL is not set — copy .env.example to .env and fill it in (see SETUP.md).')
   }
-  // Strip sslmode: newer pg treats sslmode=require as verify-full, which rejects
-  // Supabase's cert chain. We want encryption without CA verification.
-  const url = new URL(DATABASE_URL)
-  url.searchParams.delete('sslmode')
-  const connectionString = url.toString()
-  const isLocal = /@(localhost|127\.0\.0\.1)/.test(connectionString)
-
-  pool = new Pool({
-    connectionString,
-    ssl: isLocal ? false : { rejectUnauthorized: false }, // encrypt, don't verify CA
-    statement_timeout: 5000, // ms — kills a runaway/cartesian query
-    connectionTimeoutMillis: 10000,
-    max: 3,
-  })
+  pool = new Pool(poolConfig(DATABASE_URL))
   return pool
+}
+
+// Test a connection URL in isolation: a throwaway pool that never touches the
+// cached one, always torn down. Returns the public-schema table count on success
+// so the first-run wizard can both validate the URL and report what it found.
+export async function probeConnection(
+  url: string,
+): Promise<{ ok: true; tableCount: number } | { ok: false; error: string }> {
+  let probe: pg.Pool | null = null
+  try {
+    probe = new Pool(poolConfig(url, { connectionTimeoutMillis: 6000, max: 1 }))
+    const res = await probe.query(
+      "SELECT count(*)::int AS n FROM information_schema.tables WHERE table_schema = 'public'",
+    )
+    return { ok: true, tableCount: res.rows[0].n }
+  } catch (e: any) {
+    return { ok: false, error: e?.message ?? String(e) }
+  } finally {
+    if (probe) await probe.end().catch(() => {})
+  }
 }
 
 export type QueryResult = { rows: any[]; columns: string[] } | { error: string }
