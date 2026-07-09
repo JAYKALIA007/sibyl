@@ -24,3 +24,6 @@ export type AskResult =
 
 // 5xx fault body (distinct from the three domain outcomes above).
 export type Fault = { kind: 'fault'; error: string }
+
+// Status-bar metadata (server: GET /api/meta).
+export type Meta = { tables: number; model: string; database: string }

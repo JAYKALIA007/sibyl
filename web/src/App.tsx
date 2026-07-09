@@ -3,42 +3,91 @@ import { useAssistantRuntime } from '@assistant-ui/react'
 import { SibylRuntimeProvider } from './runtime'
 import { Thread } from './thread'
 import { faultBus } from './faults'
-import { SparkleIcon, PlusIcon } from './components/icons'
+import { getMeta } from './api'
+import { currentTheme, setTheme, type Theme } from './theme'
+import { SparkleIcon, PlusIcon, SunIcon, MoonIcon } from './components/icons'
+import type { Meta } from './types'
 
 export function App() {
+  const [theme, setThemeState] = useState<Theme>(currentTheme)
+  const [meta, setMeta] = useState<Meta | null>(null)
+
+  useEffect(() => {
+    getMeta().then(setMeta)
+  }, [])
+
+  function toggleTheme() {
+    const next: Theme = theme === 'dark' ? 'light' : 'dark'
+    setTheme(next)
+    setThemeState(next)
+  }
+
   return (
     <SibylRuntimeProvider>
       <div className="mx-auto flex h-full max-w-5xl flex-col">
-        <Header />
+        <TopBar theme={theme} onToggleTheme={toggleTheme} meta={meta} />
         <FaultBanner />
         <div className="min-h-0 flex-1">
-          <Thread />
+          <Thread meta={meta} />
         </div>
       </div>
     </SibylRuntimeProvider>
   )
 }
 
-function Header() {
+function TopBar({
+  theme,
+  onToggleTheme,
+  meta,
+}: {
+  theme: Theme
+  onToggleTheme: () => void
+  meta: Meta | null
+}) {
   const runtime = useAssistantRuntime()
   return (
-    <header className="flex items-center justify-between border-b border-border px-4 py-2.5">
+    <header className="flex items-center justify-between gap-3 border-b border-border px-4 py-2.5">
       <div className="flex items-center gap-2">
         <span className="flex h-6 w-6 items-center justify-center rounded-md bg-primary text-primary-foreground">
           <SparkleIcon className="text-sm" />
         </span>
         <span className="font-semibold tracking-tight">Sibyl</span>
-        <span className="hidden text-sm text-muted-foreground sm:inline">
-          — ask your database in plain English
-        </span>
+        {meta?.database && (
+          <span className="hidden max-w-[22rem] truncate text-xs text-muted-foreground sm:inline">
+            {meta.database}
+          </span>
+        )}
       </div>
-      <button
-        onClick={() => runtime.threads.switchToNewThread()}
-        className="inline-flex items-center gap-1 rounded-lg border border-border px-2.5 py-1 text-sm font-medium text-foreground/80 transition-colors hover:bg-muted"
-      >
-        <PlusIcon className="text-[15px]" /> New
-      </button>
+
+      <div className="flex items-center gap-2">
+        <ConnectionDot meta={meta} />
+        <button
+          onClick={onToggleTheme}
+          aria-label="Toggle theme"
+          className="flex h-8 w-8 items-center justify-center rounded-lg border border-border text-foreground/70 transition-colors hover:bg-muted"
+        >
+          {theme === 'dark' ? <SunIcon className="text-[15px]" /> : <MoonIcon className="text-[15px]" />}
+        </button>
+        <button
+          onClick={() => runtime.threads.switchToNewThread()}
+          className="inline-flex items-center gap-1 rounded-lg border border-border px-2.5 py-1 text-sm font-medium text-foreground/80 transition-colors hover:bg-muted"
+        >
+          <PlusIcon className="text-[15px]" /> New
+        </button>
+      </div>
     </header>
+  )
+}
+
+function ConnectionDot({ meta }: { meta: Meta | null }) {
+  const connected = meta !== null
+  return (
+    <span className="hidden items-center gap-1.5 text-xs text-muted-foreground sm:flex">
+      <span
+        className={`h-1.5 w-1.5 rounded-full ${connected ? 'bg-emerald-500' : 'bg-amber-500'}`}
+      />
+      {connected ? 'connected' : 'connecting…'}
+    </span>
   )
 }
 

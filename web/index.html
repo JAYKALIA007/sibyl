@@ -4,6 +4,19 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Sibyl</title>
+    <script>
+      // Set the theme class before first paint (no flash). Default dark; honor a
+      // saved choice, else the system preference.
+      (function () {
+        try {
+          var saved = localStorage.getItem('sibyl-theme')
+          var dark = saved ? saved === 'dark' : !matchMedia('(prefers-color-scheme: light)').matches
+          document.documentElement.classList.toggle('dark', dark)
+        } catch (e) {
+          document.documentElement.classList.add('dark')
+        }
+      })()
+    </script>
   </head>
   <body>
     <div id="root"></div>

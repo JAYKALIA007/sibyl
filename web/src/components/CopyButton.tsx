@@ -39,7 +39,7 @@ export function CopyButton({
       className={cn(
         'inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-medium',
         'text-muted-foreground transition-colors hover:bg-muted hover:text-foreground',
-        copied && 'text-emerald-600 hover:text-emerald-600',
+        copied && 'text-emerald-600 hover:text-emerald-600 dark:text-emerald-400 dark:hover:text-emerald-400',
         className,
       )}
     >

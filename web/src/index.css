@@ -1,31 +1,57 @@
 @import "tailwindcss";
 
-/* shadcn-style design tokens (light only for v1), so shadcn components dropped in
-   later (result table in the next slice) inherit a consistent theme. */
+/* Enable class-based dark mode (`.dark` on <html>, set pre-paint in index.html). */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* shadcn-style design tokens mapped to Tailwind color utilities. Values are defined
+   per-theme below; components only ever reference these names, so both themes work. */
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-panel: var(--panel);
   --color-muted: var(--muted);
   --color-muted-foreground: var(--muted-foreground);
   --color-border: var(--border);
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
+  --color-ring: var(--ring);
   --color-destructive: var(--destructive);
   --radius-lg: var(--radius);
 }
 
+/* Light theme */
 :root {
   --radius: 0.625rem;
   --background: oklch(1 0 0);
   --foreground: oklch(0.21 0.006 285.885);
-  --card: oklch(0.985 0 0);
+  --card: oklch(0.99 0 0);
+  --card-foreground: oklch(0.21 0.006 285.885);
+  --panel: oklch(0.975 0.001 286.375);
   --muted: oklch(0.967 0.001 286.375);
   --muted-foreground: oklch(0.552 0.016 285.938);
   --border: oklch(0.92 0.004 286.32);
-  --primary: oklch(0.21 0.006 285.885);
+  --primary: oklch(0.585 0.222 277.117);          /* indigo */
   --primary-foreground: oklch(0.985 0 0);
+  --ring: oklch(0.585 0.222 277.117);
   --destructive: oklch(0.577 0.245 27.325);
+}
+
+/* Dark theme — near-black canvas, panels a step lighter (DataPanel-ish) */
+.dark {
+  --background: oklch(0.165 0.004 285.9);
+  --foreground: oklch(0.97 0 0);
+  --card: oklch(0.205 0.004 285.9);
+  --card-foreground: oklch(0.97 0 0);
+  --panel: oklch(0.185 0.004 285.9);
+  --muted: oklch(0.25 0.004 286);
+  --muted-foreground: oklch(0.685 0.01 286);
+  --border: oklch(0.278 0.004 286);
+  --primary: oklch(0.62 0.19 277.117);            /* indigo, a touch brighter for dark */
+  --primary-foreground: oklch(0.985 0 0);
+  --ring: oklch(0.62 0.19 277.117);
+  --destructive: oklch(0.62 0.21 25.5);
 }
 
 html, body, #root {
@@ -37,4 +63,5 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
 }

@@ -1,4 +1,4 @@
-import type { AskResult, Fault, Turn } from './types'
+import type { AskResult, Fault, Meta, Turn } from './types'
 
 // Runtime-configurable so a future desktop shell (Tauri sidecar) can point the same
 // build at a dynamic port. Default '/api' is proxied to Express by Vite in dev.
@@ -29,4 +29,15 @@ export async function ask(question: string, history: Turn[]): Promise<AskResult>
   }
   if (!body) throw new SibylFault('empty response from server')
   return body as AskResult
+}
+
+// Best-effort status-bar metadata; null on any failure (the bar just shows less).
+export async function getMeta(): Promise<Meta | null> {
+  try {
+    const res = await fetch(`${API}/meta`)
+    if (!res.ok) return null
+    return (await res.json()) as Meta
+  } catch {
+    return null
+  }
 }
