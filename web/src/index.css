@@ -21,36 +21,37 @@
   --radius-lg: var(--radius);
 }
 
-/* Light theme */
+/* Light theme — neutral (untinted) gray canvas, emerald accent */
 :root {
   --radius: 0.625rem;
   --background: oklch(1 0 0);
-  --foreground: oklch(0.21 0.006 285.885);
+  --foreground: oklch(0.21 0 0);
   --card: oklch(0.99 0 0);
-  --card-foreground: oklch(0.21 0.006 285.885);
-  --panel: oklch(0.975 0.001 286.375);
-  --muted: oklch(0.967 0.001 286.375);
-  --muted-foreground: oklch(0.552 0.016 285.938);
-  --border: oklch(0.92 0.004 286.32);
-  --primary: oklch(0.585 0.222 277.117);          /* indigo */
+  --card-foreground: oklch(0.21 0 0);
+  --panel: oklch(0.975 0 0);
+  --muted: oklch(0.967 0 0);
+  --muted-foreground: oklch(0.552 0 0);
+  --border: oklch(0.92 0 0);
+  --primary: oklch(0.6 0.14 162);                 /* emerald */
   --primary-foreground: oklch(0.985 0 0);
-  --ring: oklch(0.585 0.222 277.117);
+  --ring: oklch(0.6 0.14 162);
   --destructive: oklch(0.577 0.245 27.325);
 }
 
-/* Dark theme — near-black canvas, panels a step lighter (DataPanel-ish) */
+/* Dark theme — near-black neutral canvas, panels a step lighter; brighter emerald
+   with dark text on the accent for legibility. */
 .dark {
-  --background: oklch(0.165 0.004 285.9);
+  --background: oklch(0.165 0 0);
   --foreground: oklch(0.97 0 0);
-  --card: oklch(0.205 0.004 285.9);
+  --card: oklch(0.205 0 0);
   --card-foreground: oklch(0.97 0 0);
-  --panel: oklch(0.185 0.004 285.9);
-  --muted: oklch(0.25 0.004 286);
-  --muted-foreground: oklch(0.685 0.01 286);
-  --border: oklch(0.278 0.004 286);
-  --primary: oklch(0.62 0.19 277.117);            /* indigo, a touch brighter for dark */
-  --primary-foreground: oklch(0.985 0 0);
-  --ring: oklch(0.62 0.19 277.117);
+  --panel: oklch(0.185 0 0);
+  --muted: oklch(0.25 0 0);
+  --muted-foreground: oklch(0.685 0 0);
+  --border: oklch(0.278 0 0);
+  --primary: oklch(0.72 0.15 162);                /* emerald, brighter for dark */
+  --primary-foreground: oklch(0.21 0.02 165);
+  --ring: oklch(0.72 0.15 162);
   --destructive: oklch(0.62 0.21 25.5);
 }
 
