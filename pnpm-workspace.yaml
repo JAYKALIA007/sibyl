@@ -1,0 +1,18 @@
+packages:
+  - web
+
+# Supply-chain cooldown: refuse any dependency version published less than a day
+# ago, so the typical npm-compromise wave (malicious versions yanked within hours)
+# never lands in an install. Setting this explicitly also turns on strict mode —
+# resolution fails rather than silently falling back to a too-new version.
+minimumReleaseAge: 1440
+
+# esbuild (via Vite) is the only dependency with a real install script — a
+# well-known, safe binary fetch — so we permit it. Nothing else may run scripts.
+onlyBuiltDependencies:
+  - esbuild
+
+# Don't auto-run `pnpm install` before every `pnpm run <script>`. We manage installs
+# explicitly, and the pre-run check otherwise hard-fails on the (harmless) esbuild
+# build-script notice under pnpm 11.
+verifyDepsBeforeRun: false

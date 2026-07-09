@@ -35,13 +35,14 @@ sibyl> How many orders did each user place?
 ## Quick start
 
 **Prerequisites:** [Ollama](https://ollama.com) running locally with `qwen2.5-coder` pulled,
-and a PostgreSQL database you can connect to.
+a PostgreSQL database you can connect to, and [pnpm](https://pnpm.io) (`corepack enable`
+ships it with Node ≥ 16).
 
 ```bash
-# 1. Clone + install
+# 1. Clone + install  (one pnpm workspace covers the engine and the web/ app)
 git clone https://github.com/JAYKALIA007/sibyl.git
 cd sibyl
-npm install        # or pnpm / yarn
+pnpm install
 
 # 2. Pull the model
 ollama pull qwen2.5-coder
@@ -55,8 +56,13 @@ cp .env.example .env
 #    See SETUP.md for the full read-only role setup.
 
 # 5. Start the REPL
-npm run sibyl
+pnpm sibyl
 ```
+
+> **Why pnpm?** Beyond a strict, content-addressed `node_modules`, we set a
+> [`minimumReleaseAge`](https://pnpm.io/settings#minimumreleaseage) of 24h — pnpm
+> refuses any dependency version published less than a day ago, so the typical
+> npm-supply-chain compromise (malicious versions yanked within hours) never lands.
 
 ### Using your own database
 
@@ -70,7 +76,7 @@ Sibyl introspects the schema automatically — no configuration needed. Or point
 one for a single run without touching `.env`:
 
 ```bash
-npm run sibyl -- --db postgresql://user:pass@host:5432/dbname
+pnpm sibyl --db postgresql://user:pass@host:5432/dbname
 ```
 
 ### Built-in commands
@@ -154,18 +160,17 @@ A browser front-end (React + shadcn + assistant-ui) over the same engine.
 **Run it (one process):**
 
 ```bash
-npm run start     # builds web/ and serves the app + API at http://127.0.0.1:3001
+pnpm start        # builds web/ and serves the app + API at http://127.0.0.1:3001
 ```
 
 **Develop it (two processes, hot reload):**
 
 ```bash
 # terminal 1 — the API (Express over core.ask, localhost only)
-npm run server
+pnpm server
 
 # terminal 2 — the React app (Vite dev server, proxies /api → :3001)
-npm --prefix web install   # first time
-npm --prefix web run dev   # → http://localhost:5173
+pnpm --filter sibyl-web dev   # → http://localhost:5173
 ```
 
 The server is stateless and loopback-bound; the browser owns the conversation.
@@ -176,20 +181,20 @@ desktop shell that serves its own assets.
 ## Development
 
 ```bash
-npm run ollama:check   # verify Ollama + model
-npm run db:check       # verify DB connection + read-only role
-npm run schema:ddl     # print live schema as DDL
-npm run nl2sql:check   # generate SQL for sample questions
-npm run core:check     # run sample questions end-to-end
-npm run test           # unit tests (comparator + guard + schema formatter)
-npm run eval           # single-turn execution-accuracy eval (score vs gold SQL)
-npm run eval:multi     # multi-turn (conversational) eval + memory controls
-npm run sibyl          # interactive REPL
+pnpm ollama:check   # verify Ollama + model
+pnpm db:check       # verify DB connection + read-only role
+pnpm schema:ddl     # print live schema as DDL
+pnpm nl2sql:check   # generate SQL for sample questions
+pnpm core:check     # run sample questions end-to-end
+pnpm test           # unit tests (comparator + guard + schema formatter)
+pnpm eval           # single-turn execution-accuracy eval (score vs gold SQL)
+pnpm eval:multi     # multi-turn (conversational) eval + memory controls
+pnpm sibyl          # interactive REPL
 ```
 
 ## Measuring accuracy
 
-`npm run eval` scores generated SQL against hand-written **gold SQL** by *executing
+`pnpm eval` scores generated SQL against hand-written **gold SQL** by *executing
 both and comparing the rows* — not by matching query text. The brain is swappable;
 the eval decides which brain wins:
 
@@ -203,12 +208,12 @@ Sibyl execution-accuracy eval — model: qwen2.5-coder
 Swap the model to see the number move:
 
 ```bash
-SIBYL_CHAT_MODEL=llama3.2 npm run eval    # → 7/9 (78%): misses AND-tag + ordering
+SIBYL_CHAT_MODEL=llama3.2 pnpm eval    # → 7/9 (78%): misses AND-tag + ordering
 ```
 
 ### Multi-turn eval
 
-`npm run eval:multi` scores *conversations* — later turns refer back ("how many
+`pnpm eval:multi` scores *conversations* — later turns refer back ("how many
 did **they** order?"). It self-threads (feeds the model its own prior SQL, like the
 CLI does) and reports two numbers plus a **no-history control** that proves the
 memory — not luck — is doing the work:
