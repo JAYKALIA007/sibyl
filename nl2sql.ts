@@ -3,7 +3,7 @@
 // — important for the eval. Emits the sentinel NO_ANSWER when the question can't be
 // answered from the schema (the core engine turns that into a graceful refusal).
 
-import { generate } from './ollama.ts'
+import { generateWithUsage, type Usage } from './ollama.ts'
 
 export const NO_ANSWER = 'NO_ANSWER'
 
@@ -56,12 +56,12 @@ export async function toSql(
   ddl: string,
   question: string,
   opts: { temperature?: number; feedback?: Feedback; history?: Turn[] } = {}
-): Promise<string> {
-  const raw = await generate(
+): Promise<{ sql: string; usage: Usage }> {
+  const { text, usage } = await generateWithUsage(
     buildPrompt(ddl, question, { feedback: opts.feedback, history: opts.history }),
     { temperature: opts.temperature ?? 0, system: SYSTEM }
   )
-  return extractSql(raw)
+  return { sql: extractSql(text), usage }
 }
 
 // `npm run nl2sql:check` — generate SQL for sample questions against the live schema
@@ -82,12 +82,13 @@ if (import.meta.url === `file://${process.argv[1]}`) {
 
   for (const q of questions) {
     console.log(`\nQ: ${q}`)
-    const sql = await toSql(ddl, q)
+    const { sql, usage } = await toSql(ddl, q)
     if (sql === NO_ANSWER) {
       console.log('  → NO_ANSWER (not in schema)')
       continue
     }
     console.log(`  SQL: ${sql.replace(/\s+/g, ' ')}`)
+    console.log(`  tokens: prompt ${usage.promptTokens ?? '?'} / out ${usage.outputTokens ?? '?'}`)
     const g = guard(sql)
     if (!g.ok) {
       console.log(`  guard rejected: ${g.reason}`)

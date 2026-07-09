@@ -92,6 +92,14 @@ Ollama's default context window is only 2,048 tokens; Sibyl raises it to 8,192 s
 the schema and conversation fit. Override with `SIBYL_NUM_CTX` (qwen2.5-coder
 supports up to 32,768).
 
+Every answer prints a **token meter** (real counts from Ollama) so you can watch
+how full the window is — the signal for when a schema has outgrown "whole schema
+in the prompt":
+
+```
+ctx 1,009 / 8,192 (12%)  ·  out 30
+```
+
 ## Setup (seed database + read-only role)
 
 See [`SETUP.md`](./SETUP.md) for the full walkthrough:

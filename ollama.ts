@@ -21,8 +21,17 @@ type GenerateOptions = {
   system?: string
 }
 
-// Ask the chat model for a completion. Non-streaming (we want the whole SQL/answer).
-export async function generate(prompt: string, opts: GenerateOptions = {}): Promise<string> {
+// Real token counts Ollama returns on every non-streaming completion:
+//   promptTokens = the whole input (system + schema + history + question)
+//   outputTokens = what the model generated
+// Undefined if the server omits them (older Ollama); callers degrade gracefully.
+export type Usage = { promptTokens?: number; outputTokens?: number }
+
+// Ask the chat model for a completion, returning the text AND token usage.
+export async function generateWithUsage(
+  prompt: string,
+  opts: GenerateOptions = {}
+): Promise<{ text: string; usage: Usage }> {
   const res = await fetch(`${OLLAMA}/api/generate`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -38,8 +47,21 @@ export async function generate(prompt: string, opts: GenerateOptions = {}): Prom
     }),
   })
   if (!res.ok) throw new Error(`generate failed: ${res.status} ${await res.text()}`)
-  const data = (await res.json()) as { response: string }
-  return data.response
+  const data = (await res.json()) as {
+    response: string
+    prompt_eval_count?: number
+    eval_count?: number
+  }
+  return {
+    text: data.response,
+    usage: { promptTokens: data.prompt_eval_count, outputTokens: data.eval_count },
+  }
+}
+
+// Text-only convenience for callers that don't care about token usage.
+export async function generate(prompt: string, opts: GenerateOptions = {}): Promise<string> {
+  const { text } = await generateWithUsage(prompt, opts)
+  return text
 }
 
 // Turn text into a meaning-vector. Not needed for v1 SQL generation, but the seam

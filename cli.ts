@@ -74,6 +74,20 @@ function renderTable(columns: string[], rows: Record<string, unknown>[]): string
   return lines.join('\n')
 }
 
+// ── token meter ────────────────────────────────────────────────────────────────
+// Real counts from Ollama. Shows how full the context window is — the signal that
+// tells you when the schema has outgrown "whole schema in the prompt" (→ schema-RAG).
+
+function formatMeter(usage: { promptTokens?: number; outputTokens?: number; numCtx: number }): string {
+  const n = (x: number) => x.toLocaleString('en-US')
+  if (usage.promptTokens === undefined) {
+    return c.dim(`  ctx ?/${n(usage.numCtx)} (Ollama didn't report token counts)`)
+  }
+  const pct = Math.round((usage.promptTokens / usage.numCtx) * 100)
+  const out = usage.outputTokens ?? 0
+  return c.dim(`  ctx ${n(usage.promptTokens)} / ${n(usage.numCtx)} (${pct}%)  ·  out ${n(out)}`)
+}
+
 // ── connection info ───────────────────────────────────────────────────────────
 
 function parseConnInfo(raw: string): string {
@@ -214,6 +228,7 @@ async function repl(): Promise<void> {
       c.bold(` ${result.summary}`) +
       c.dim(` (${elapsed}s, ${result.rows.length} row${result.rows.length === 1 ? '' : 's'})`)
     )
+    console.log(formatMeter(result.usage))
     console.log()
 
     // Only successful turns graduate into history (ADR 0001); keep the last N.
