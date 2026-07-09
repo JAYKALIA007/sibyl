@@ -9,12 +9,16 @@ import { getSchema, toDDL } from './introspect.ts'
 import { toSql, NO_ANSWER, type Turn } from './nl2sql.ts'
 import { guard } from './guard.ts'
 import { runQuery } from './db.ts'
-import { generate } from './ollama.ts'
+import { generate, NUM_CTX, type Usage } from './ollama.ts'
 
 export type { Turn }
 
+// Token usage of the SQL-generation call (schema + history + question), plus the
+// configured context window, so a surface can show how full the window is.
+export type AskUsage = Usage & { numCtx: number }
+
 export type AskResult =
-  | { kind: 'answer'; sql: string; rows: any[]; columns: string[]; summary: string; attempts: number }
+  | { kind: 'answer'; sql: string; rows: any[]; columns: string[]; summary: string; attempts: number; usage: AskUsage }
   | { kind: 'refused'; reason: string }
   | { kind: 'error'; sql: string; error: string; attempts: number }
 
@@ -57,7 +61,7 @@ export async function ask(question: string, history: Turn[] = []): Promise<AskRe
   while (attempts < MAX_ATTEMPTS) {
     attempts++
 
-    const sql = await toSql(ddl, question, { feedback, history })
+    const { sql, usage } = await toSql(ddl, question, { feedback, history })
     if (sql === NO_ANSWER) {
       return { kind: 'refused', reason: "That can't be answered from this database's schema." }
     }
@@ -76,7 +80,15 @@ export async function ask(question: string, history: Turn[] = []): Promise<AskRe
 
     // Success — note that 0 rows is a valid answer, not an error.
     const summary = await summarize(question, res.rows, res.columns)
-    return { kind: 'answer', sql: g.sql, rows: res.rows, columns: res.columns, summary, attempts }
+    return {
+      kind: 'answer',
+      sql: g.sql,
+      rows: res.rows,
+      columns: res.columns,
+      summary,
+      attempts,
+      usage: { ...usage, numCtx: NUM_CTX },
+    }
   }
 
   return {

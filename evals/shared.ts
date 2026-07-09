@@ -24,7 +24,7 @@ export async function generateAndRun(
   question: string,
   history: Turn[] = []
 ): Promise<RunResult> {
-  const sql = await toSql(ddl, question, { temperature: 0, history })
+  const { sql } = await toSql(ddl, question, { temperature: 0, history })
   if (sql === NO_ANSWER) return { kind: 'refused' }
 
   const g = guard(sql)
