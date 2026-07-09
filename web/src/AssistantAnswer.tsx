@@ -1,20 +1,22 @@
 import type { AskResult, AskUsage } from './types'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from './components/ui/table'
+import { CopyButton } from './components/CopyButton'
+import { toCsv } from './csv'
 
 const DISPLAY_ROW_CAP = 20
 
 export function AssistantAnswer({ result }: { result: AskResult }) {
   if (result.kind === 'refused') {
     return (
-      <div className="flex items-start gap-2 text-sm text-amber-700">
-        <span aria-hidden>⚠</span>
+      <div className="flex items-start gap-2 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800">
+        <span aria-hidden className="mt-px">⚠</span>
         <p>{result.reason}</p>
       </div>
     )
   }
   if (result.kind === 'error') {
     return (
-      <div className="text-sm">
+      <div className="rounded-md bg-destructive/5 px-3 py-2 text-sm">
         <p className="flex items-start gap-2 font-medium text-destructive">
           <span aria-hidden>✗</span>
           <span>
@@ -29,7 +31,7 @@ export function AssistantAnswer({ result }: { result: AskResult }) {
 
   return (
     <div className="flex flex-col gap-3">
-      <p className="text-sm font-medium">{result.summary}</p>
+      <p className="text-sm leading-relaxed">{result.summary}</p>
       <SqlBlock sql={result.sql} />
       <ResultTable columns={result.columns} rows={result.rows} />
       <Meter usage={result.usage} rowCount={result.rows.length} attempts={result.attempts} />
@@ -38,10 +40,17 @@ export function AssistantAnswer({ result }: { result: AskResult }) {
 }
 
 function SqlBlock({ sql }: { sql: string }) {
+  const pretty = sql.replace(/\s+/g, ' ').trim()
   return (
-    <pre className="overflow-x-auto rounded-md bg-muted px-3 py-2 font-mono text-xs leading-relaxed text-foreground">
-      {sql.replace(/\s+/g, ' ').trim()}
-    </pre>
+    <div className="overflow-hidden rounded-md border border-border bg-muted/60">
+      <div className="flex items-center justify-between border-b border-border/70 px-3 py-1">
+        <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">SQL</span>
+        <CopyButton text={pretty} label="Copy" />
+      </div>
+      <pre className="overflow-x-auto px-3 py-2 font-mono text-xs leading-relaxed text-foreground">
+        {pretty}
+      </pre>
+    </div>
   )
 }
 
@@ -56,32 +65,45 @@ function ResultTable({
     return <p className="text-sm text-muted-foreground">No rows matched.</p>
   }
   const shown = rows.slice(0, DISPLAY_ROW_CAP)
+  const overflow = rows.length - DISPLAY_ROW_CAP
   return (
-    <div className="rounded-md border border-border">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            {columns.map((col) => (
-              <TableHead key={col}>{col}</TableHead>
-            ))}
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {shown.map((row, i) => (
-            <TableRow key={i}>
+    <div className="overflow-hidden rounded-md border border-border">
+      <div className="flex items-center justify-between border-b border-border bg-muted/40 px-3 py-1">
+        <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+          {rows.length.toLocaleString('en-US')} row{rows.length === 1 ? '' : 's'}
+        </span>
+        <CopyButton
+          text={toCsv(columns, rows)}
+          label="Copy CSV"
+          copiedLabel="Copied"
+          variant="download"
+        />
+      </div>
+      <div className="max-h-80 overflow-auto">
+        <Table>
+          <TableHeader className="sticky top-0 z-10 bg-card">
+            <TableRow>
               {columns.map((col) => (
-                <TableCell key={col} className="font-mono text-xs">
-                  {formatCell(row[col])}
-                </TableCell>
+                <TableHead key={col} className="whitespace-nowrap">{col}</TableHead>
               ))}
             </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-      {rows.length > DISPLAY_ROW_CAP && (
+          </TableHeader>
+          <TableBody>
+            {shown.map((row, i) => (
+              <TableRow key={i} className="even:bg-muted/30">
+                {columns.map((col) => (
+                  <TableCell key={col} className="whitespace-nowrap font-mono text-xs">
+                    {formatCell(row[col])}
+                  </TableCell>
+                ))}
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+      {overflow > 0 && (
         <p className="border-t border-border px-3 py-1.5 text-xs text-muted-foreground">
-          … and {rows.length - DISPLAY_ROW_CAP} more row
-          {rows.length - DISPLAY_ROW_CAP === 1 ? '' : 's'}
+          … and {overflow.toLocaleString('en-US')} more row{overflow === 1 ? '' : 's'} — Copy CSV for all
         </p>
       )}
     </div>
@@ -98,17 +120,26 @@ function Meter({
   attempts: number
 }) {
   const n = (x: number) => x.toLocaleString('en-US')
-  const ctx =
-    usage.promptTokens === undefined
-      ? `ctx ?/${n(usage.numCtx)}`
-      : `ctx ${n(usage.promptTokens)} / ${n(usage.numCtx)} (${Math.round(
-          (usage.promptTokens / usage.numCtx) * 100,
-        )}%)`
+  const hasCtx = usage.promptTokens !== undefined
+  const pct = hasCtx ? Math.min(100, Math.round((usage.promptTokens! / usage.numCtx) * 100)) : 0
   return (
-    <p className="text-xs text-muted-foreground">
-      {ctx} · out {n(usage.outputTokens ?? 0)} · {n(rowCount)} row{rowCount === 1 ? '' : 's'}
-      {attempts > 1 ? ` · ${attempts} attempts` : ''}
-    </p>
+    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+      {hasCtx && (
+        <span className="h-1 w-16 overflow-hidden rounded-full bg-muted" aria-hidden>
+          <span
+            className="block h-full rounded-full bg-muted-foreground/50"
+            style={{ width: `${pct}%` }}
+          />
+        </span>
+      )}
+      <span>
+        {hasCtx
+          ? `ctx ${n(usage.promptTokens!)} / ${n(usage.numCtx)} (${pct}%)`
+          : `ctx ?/${n(usage.numCtx)}`}{' '}
+        · out {n(usage.outputTokens ?? 0)} · {n(rowCount)} row{rowCount === 1 ? '' : 's'}
+        {attempts > 1 ? ` · ${attempts} attempts` : ''}
+      </span>
+    </div>
   )
 }
 
