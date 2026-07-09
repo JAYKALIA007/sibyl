@@ -13,6 +13,8 @@
     "eval": "node --import tsx --env-file=.env evals/run.ts",
     "eval:multi": "node --import tsx --env-file=.env evals/run-conversations.ts",
     "server": "node --import tsx --env-file=.env server.ts",
+    "web:build": "npm --prefix web install && npm --prefix web run build",
+    "start": "npm run web:build && npm run server",
     "test": "node --import tsx --test *.test.ts"
   },
   "license": "MIT",

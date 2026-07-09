@@ -6,12 +6,22 @@
 // on the network. No auth in v1: it's a local tool, creds stay server-side in .env.
 
 import express from 'express'
+import { existsSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { ask, loadSchema, type Turn } from './core.ts'
 import { close } from './db.ts'
 import { mapResult, mapFault } from './responseMapper.ts'
 
 const HOST = '127.0.0.1'
 const PORT = Number(process.env.SIBYL_PORT) || 3001
+
+// Serving the built SPA is a SEPARATE concern from serving the API: on the web it's
+// convenient to do both from one process, but a future desktop shell (Tauri/Wails)
+// serves the assets itself and wants the sidecar to expose ONLY /api. Toggle off
+// with SIBYL_SERVE_STATIC=false.
+const SERVE_STATIC = process.env.SIBYL_SERVE_STATIC !== 'false'
+const WEB_DIST = join(dirname(fileURLToPath(import.meta.url)), 'web', 'dist')
 
 const app = express()
 app.use(express.json())
@@ -38,6 +48,23 @@ app.post('/api/ask', async (req, res) => {
     const { status, body } = mapFault(err)
     res.status(status).json(body)
   }
+})
+
+// Static SPA — mounted AFTER the API routes, and never shadowing /api. Only when
+// enabled and actually built. A GET fallback returns index.html for client routes;
+// unknown /api paths fall through to a JSON 404.
+if (SERVE_STATIC && existsSync(WEB_DIST)) {
+  app.use(express.static(WEB_DIST))
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api')) return next()
+    res.sendFile(join(WEB_DIST, 'index.html'))
+  })
+} else if (SERVE_STATIC) {
+  console.log('web/dist not found — API only. Run `npm run web:build` to serve the UI.')
+}
+
+app.use('/api', (_req, res) => {
+  res.status(404).json({ kind: 'fault', error: 'not found' })
 })
 
 // Warm the schema/DDL cache before accepting traffic so the first ask isn't cold.
