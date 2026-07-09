@@ -6,17 +6,34 @@ import {
 } from '@assistant-ui/react'
 import { ask, SibylFault } from './api'
 import { faultBus } from './faults'
+import { deriveHistory, type HistoryMessage } from './history'
 import type { AskResult } from './types'
 
-// Pull the text out of the just-sent user message.
-function lastUserText(messages: readonly { role: string; content: readonly unknown[] }[]): string {
-  const last = messages[messages.length - 1]
-  if (!last) return ''
-  return (last.content as { type: string; text?: string }[])
+type RunMessage = { role: string; content: readonly unknown[]; metadata?: { custom?: unknown } }
+
+function partsText(content: readonly unknown[]): string {
+  return (content as { type: string; text?: string }[])
     .filter((p) => p.type === 'text' && typeof p.text === 'string')
     .map((p) => p.text)
     .join('\n')
     .trim()
+}
+
+// Pull the text out of the just-sent user message.
+function lastUserText(messages: readonly RunMessage[]): string {
+  const last = messages[messages.length - 1]
+  return last ? partsText(last.content) : ''
+}
+
+// Map assistant-ui thread messages into the normalized shape the (pure) history
+// derivation understands. The visual thread stays untouched; this only feeds the
+// capped model-context buffer.
+function toHistoryMessages(messages: readonly RunMessage[]): HistoryMessage[] {
+  return messages.map((m) =>
+    m.role === 'assistant'
+      ? { role: 'assistant', result: (m.metadata?.custom as { result?: AskResult })?.result ?? null }
+      : { role: 'user', text: partsText(m.content) },
+  )
 }
 
 // A short text fallback (accessibility / non-custom renderers). The rich message
@@ -35,9 +52,12 @@ function fallbackText(result: AskResult): string {
 const adapter: ChatModelAdapter = {
   async run({ messages }) {
     const question = lastUserText(messages)
+    // Capped {question, sql} buffer derived from prior SUCCESSFUL turns only —
+    // separate from the visual thread (ADR 0001). The trailing (current) question
+    // is naturally excluded (no answer follows it yet).
+    const history = deriveHistory(toHistoryMessages(messages))
     try {
-      // History threading (window of 3) lands in a later slice; send none for now.
-      const result = await ask(question, [])
+      const result = await ask(question, history)
       faultBus.emit(null) // a success clears any stale connection banner
       // The full result rides along in metadata.custom; the assistant message reads
       // it to render SQL + table + summary + meter.
