@@ -56,9 +56,24 @@ npx sibyl-cli            # run without installing
 npm i -g sibyl-cli       # then just: sibyl
 ```
 
-The package publishes as `sibyl-cli`; the command it installs is **`sibyl`**. On first
-run, if no database is configured, Sibyl walks you through it — asks for a Postgres
-URL, connects, and offers to save it. Launch the web GUI with `sibyl serve`.
+The package publishes as `sibyl-cli`; the command it installs is **`sibyl`**. Launch
+the web GUI instead with `sibyl serve`.
+
+### Your first run
+
+With nothing configured, `sibyl` guides you through setup — no config files to edit
+first:
+
+1. **Database** — if no `DATABASE_URL` is set, it asks for a Postgres connection URL,
+   connects to check it, reports the table count, and offers to save it to `.env`.
+2. **Model** — if Ollama isn't running it tells you to start it; if the model isn't
+   pulled it offers to run `ollama pull` for you.
+3. **REPL** — then you land at the `sibyl>` prompt. Ask away.
+
+> Sibyl reads `.env` from — and saves it to — the **current directory**. Run it from
+> the folder where you want that `.env` to live (a per-project data folder is a good
+> home). Point at a database for a single run without any file via
+> `sibyl --db "postgresql://…"`.
 
 ## Quick start (from source)
 
