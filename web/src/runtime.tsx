@@ -4,7 +4,8 @@ import {
   useLocalRuntime,
   type ChatModelAdapter,
 } from '@assistant-ui/react'
-import { ask } from './api'
+import { ask, SibylFault } from './api'
+import { faultBus } from './faults'
 import type { AskResult } from './types'
 
 // Pull the text out of the just-sent user message.
@@ -34,13 +35,22 @@ function fallbackText(result: AskResult): string {
 const adapter: ChatModelAdapter = {
   async run({ messages }) {
     const question = lastUserText(messages)
-    // History threading (window of 3) lands in a later slice; send none for now.
-    const result = await ask(question, [])
-    // The full result rides along in metadata.custom; the assistant message reads it
-    // to render SQL + table + summary + meter. Faults thrown by ask propagate.
-    return {
-      content: [{ type: 'text', text: fallbackText(result) }],
-      metadata: { custom: { result } },
+    try {
+      // History threading (window of 3) lands in a later slice; send none for now.
+      const result = await ask(question, [])
+      faultBus.emit(null) // a success clears any stale connection banner
+      // The full result rides along in metadata.custom; the assistant message reads
+      // it to render SQL + table + summary + meter.
+      return {
+        content: [{ type: 'text', text: fallbackText(result) }],
+        metadata: { custom: { result } },
+      }
+    } catch (e) {
+      // A genuine fault (5xx / network) is a connection problem, not a chat message.
+      // Surface it as a top-level banner; rethrow so the turn ends with no result
+      // (the assistant message renders nothing — see thread.tsx).
+      if (e instanceof SibylFault) faultBus.emit(e.message)
+      throw e
     }
   },
 }

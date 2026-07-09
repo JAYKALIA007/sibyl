@@ -5,16 +5,24 @@ const DISPLAY_ROW_CAP = 20
 
 export function AssistantAnswer({ result }: { result: AskResult }) {
   if (result.kind === 'refused') {
-    return <p className="text-sm text-muted-foreground">⚠ {result.reason}</p>
+    return (
+      <div className="flex items-start gap-2 text-sm text-amber-700">
+        <span aria-hidden>⚠</span>
+        <p>{result.reason}</p>
+      </div>
+    )
   }
   if (result.kind === 'error') {
     return (
       <div className="text-sm">
-        <p className="font-medium text-destructive">
-          ✗ Couldn&apos;t build a valid query after {result.attempts} attempt
-          {result.attempts === 1 ? '' : 's'}.
+        <p className="flex items-start gap-2 font-medium text-destructive">
+          <span aria-hidden>✗</span>
+          <span>
+            Couldn&apos;t build a valid query after {result.attempts} attempt
+            {result.attempts === 1 ? '' : 's'}.
+          </span>
         </p>
-        <p className="mt-1 whitespace-pre-wrap text-muted-foreground">{result.error}</p>
+        <p className="mt-1 whitespace-pre-wrap pl-6 text-muted-foreground">{result.error}</p>
       </div>
     )
   }
