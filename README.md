@@ -34,12 +34,21 @@ sibyl> How many orders did each user place?
 
 ## Install
 
-**Prerequisites** (Sibyl talks to these — `npx sibyl-cli` installs the CLI only, not
-these):
+Sibyl runs entirely on a **local LLM** — nothing leaves your machine, and there's no
+API key. It talks to two things that `npx sibyl-cli` does **not** install: a local
+[Ollama](https://ollama.com) and a PostgreSQL database.
 
-1. [**Ollama**](https://ollama.com) installed and running — it's a separate local
-   service Sibyl calls at `localhost:11434`. Pull the model once: `ollama pull qwen2.5-coder`.
-2. A **PostgreSQL** database you can connect to.
+**If you don't already have a local model, run this once:**
+
+```bash
+# 1. install Ollama (macOS / Linux / Windows) from https://ollama.com, then:
+ollama pull qwen2.5-coder      # the model Sibyl uses to write SQL (~4.7 GB)
+```
+
+Sibyl checks this on startup — if Ollama isn't running, or the model isn't pulled, it
+tells you exactly what to run (and offers to pull the model for you).
+
+**Then run Sibyl:**
 
 ```bash
 npx sibyl-cli            # run without installing

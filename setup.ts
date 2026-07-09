@@ -8,7 +8,9 @@
 import * as readline from 'node:readline/promises'
 import { stdin as input, stdout as output } from 'node:process'
 import { readFileSync, writeFileSync } from 'node:fs'
+import { spawn } from 'node:child_process'
 import { probeConnection } from './db.ts'
+import { checkOllama, OLLAMA } from './ollama.ts'
 import { c } from './colors.ts'
 
 const DEFAULT_LOCAL_URL = 'postgresql://localhost:5432/postgres'
@@ -56,6 +58,64 @@ function readEnv(): string | null {
   } catch {
     return null
   }
+}
+
+// Run `ollama pull <model>` with the live progress bar (inherited stdio). Resolves
+// false if Ollama isn't on PATH or the pull fails.
+function pullModel(model: string): Promise<boolean> {
+  return new Promise((resolve) => {
+    const child = spawn('ollama', ['pull', model], { stdio: 'inherit' })
+    child.on('error', () => resolve(false))
+    child.on('close', (code) => resolve(code === 0))
+  })
+}
+
+// Preflight the local LLM before we rely on it. If Ollama is down or the model
+// isn't pulled, give the exact fix (and offer to pull it). Returns false when Sibyl
+// can't proceed, so the caller can exit cleanly instead of failing mid-question.
+export async function ensureOllamaReady(): Promise<boolean> {
+  const status = await checkOllama()
+  if (status.ok) return true
+
+  if (status.reason === 'unreachable') {
+    console.log()
+    console.log(c.red('  ✗  Can’t reach Ollama') + c.dim(` at ${OLLAMA}.`))
+    console.log('     Sibyl uses a local LLM (via Ollama) to write SQL.')
+    console.log(`     Install it from ${c.cyan('https://ollama.com')}, start it, then re-run.`)
+    console.log(c.dim('     (Already running elsewhere? Point Sibyl with OLLAMA_HOST.)\n'))
+    return false
+  }
+
+  const cmd = `ollama pull ${status.model}`
+  console.log()
+  console.log(c.yellow(`  ⚠  The model ${c.bold(status.model)} isn’t pulled yet.`))
+
+  if (!input.isTTY) {
+    console.log(`     Run ${c.cyan(cmd)} and re-run Sibyl.\n`)
+    return false
+  }
+
+  const rl = readline.createInterface({ input, output })
+  let answer: string
+  try {
+    answer = (await rl.question(`  Pull it now? ${c.dim('[Y/n]')} `)).trim().toLowerCase()
+  } catch {
+    answer = 'n'
+  } finally {
+    rl.close()
+  }
+  if (answer !== '' && answer !== 'y' && answer !== 'yes') {
+    console.log(`     Run ${c.cyan(cmd)} when you’re ready.\n`)
+    return false
+  }
+
+  console.log(c.dim(`  Pulling ${status.model}…\n`))
+  if (!(await pullModel(status.model))) {
+    console.log(c.red('  ✗  Pull failed.') + ` Run ${c.cyan(cmd)} manually.\n`)
+    return false
+  }
+  console.log(c.green('  ✓') + ` ${status.model} is ready.\n`)
+  return true
 }
 
 // Interactive entry. Returns true once DATABASE_URL is configured in the process

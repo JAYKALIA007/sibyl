@@ -16,9 +16,43 @@ export const EMBED_MODEL = process.env.SIBYL_EMBED_MODEL || 'nomic-embed-text'
 // 2048 default. Set it explicitly; override with SIBYL_NUM_CTX.
 export const NUM_CTX = Number(process.env.SIBYL_NUM_CTX) || 8192
 
+export { OLLAMA }
+
 type GenerateOptions = {
   temperature?: number // 0 = deterministic (used by the eval)
   system?: string
+}
+
+// Is `wanted` among the pulled models? Ollama tags models as `name:tag` (e.g.
+// `qwen2.5-coder:latest`); our CHAT_MODEL is usually the bare name, so an untagged
+// request matches any tag of that model. Pure — unit-tested.
+export function hasModel(available: string[], wanted: string): boolean {
+  if (available.includes(wanted)) return true
+  if (wanted.includes(':')) return false
+  return available.some((m) => m.split(':')[0] === wanted)
+}
+
+export type OllamaStatus =
+  | { ok: true; models: string[] }
+  | { ok: false; reason: 'unreachable'; error: string }
+  | { ok: false; reason: 'model-missing'; model: string; models: string[] }
+
+// Preflight: is Ollama up and is the chat model pulled? Callers turn this into
+// actionable guidance instead of a raw fetch error deep in the first question.
+export async function checkOllama(): Promise<OllamaStatus> {
+  let models: string[]
+  try {
+    const res = await fetch(`${OLLAMA}/api/tags`, { signal: AbortSignal.timeout(4000) })
+    if (!res.ok) return { ok: false, reason: 'unreachable', error: `HTTP ${res.status}` }
+    const data = (await res.json()) as { models?: { name: string }[] }
+    models = (data.models ?? []).map((m) => m.name)
+  } catch (e) {
+    return { ok: false, reason: 'unreachable', error: (e as Error).message }
+  }
+  if (!hasModel(models, CHAT_MODEL)) {
+    return { ok: false, reason: 'model-missing', model: CHAT_MODEL, models }
+  }
+  return { ok: true, models }
 }
 
 // Real token counts Ollama returns on every non-streaming completion:

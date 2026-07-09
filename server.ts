@@ -11,6 +11,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { ask, loadSchema, type Turn } from './core.ts'
 import { close } from './db.ts'
+import { checkOllama, OLLAMA } from './ollama.ts'
 import { mapResult, mapFault } from './responseMapper.ts'
 
 const HOST = '127.0.0.1'
@@ -66,6 +67,18 @@ if (SERVE_STATIC && existsSync(WEB_DIST)) {
 app.use('/api', (_req, res) => {
   res.status(404).json({ kind: 'fault', error: 'not found' })
 })
+
+// Preflight the local LLM (non-interactive here): refuse to start with a clear
+// message rather than 500-ing on the first question.
+const ollama = await checkOllama()
+if (!ollama.ok) {
+  if (ollama.reason === 'unreachable') {
+    console.error(`Can't reach Ollama at ${OLLAMA} — install from https://ollama.com and start it.`)
+  } else {
+    console.error(`Ollama model "${ollama.model}" isn't pulled — run: ollama pull ${ollama.model}`)
+  }
+  process.exit(1)
+}
 
 // Warm the schema/DDL cache before accepting traffic so the first ask isn't cold.
 await loadSchema()
