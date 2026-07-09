@@ -11,6 +11,7 @@
   --color-border: var(--border);
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
+  --color-destructive: var(--destructive);
   --radius-lg: var(--radius);
 }
 
@@ -24,6 +25,7 @@
   --border: oklch(0.92 0.004 286.32);
   --primary: oklch(0.21 0.006 285.885);
   --primary-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
 }
 
 html, body, #root {

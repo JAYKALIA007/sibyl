@@ -4,8 +4,11 @@ import {
   MessagePartPrimitive,
   ComposerPrimitive,
   useThread,
+  useMessage,
 } from '@assistant-ui/react'
 import { cn } from './lib/utils'
+import { AssistantAnswer } from './AssistantAnswer'
+import type { AskResult } from './types'
 
 export function Thread() {
   return (
@@ -49,10 +52,17 @@ function UserMessage() {
 }
 
 function AssistantMessage() {
+  const result = useMessage(
+    (m) => (m.metadata.custom as { result?: AskResult } | undefined)?.result,
+  )
   return (
     <MessagePrimitive.Root className="flex justify-start">
-      <div className="max-w-[85%] rounded-lg border border-border bg-card px-4 py-3">
-        <MessagePrimitive.Parts components={{ Text: AssistantText }} />
+      <div className="w-full rounded-lg border border-border bg-card px-4 py-3">
+        {result ? (
+          <AssistantAnswer result={result} />
+        ) : (
+          <MessagePrimitive.Parts components={{ Text: AssistantText }} />
+        )}
       </div>
     </MessagePrimitive.Root>
   )
