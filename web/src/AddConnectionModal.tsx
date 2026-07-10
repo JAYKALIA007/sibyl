@@ -4,13 +4,12 @@
 
 import { useState } from 'react'
 import { Modal } from './components/Modal'
-import { cn } from './lib/utils'
 import { addConnection } from './api'
 import type { ConnectionView } from './types'
 
-// A small palette for tagging connections in the rail — enough to tell prod from
-// staging from a scratch DB at a glance.
-const COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#f43f5e', '#8b5cf6', '#64748b']
+// Color tags are deferred — the picker is commented out below (backend + rail
+// rendering still support `color`, so re-enabling it is UI-only).
+// const COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#f43f5e', '#8b5cf6', '#64748b']
 
 export function AddConnectionModal({
   onClose,
@@ -21,7 +20,6 @@ export function AddConnectionModal({
 }) {
   const [name, setName] = useState('')
   const [url, setUrl] = useState('')
-  const [color, setColor] = useState<string>(COLORS[0])
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
 
@@ -29,7 +27,7 @@ export function AddConnectionModal({
     if (!url.trim() || saving) return
     setSaving(true)
     setError(null)
-    const result = await addConnection({ name: name.trim() || undefined, url: url.trim(), color })
+    const result = await addConnection({ name: name.trim() || undefined, url: url.trim() })
     setSaving(false)
     if (result.ok) onAdded(result.connection)
     else setError(result.error)
@@ -43,7 +41,7 @@ export function AddConnectionModal({
             autoFocus
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="Production, Staging, Fantasy WC…"
+            placeholder="Production, Staging, Analytics…"
             className="w-full rounded-md border border-border bg-background px-2.5 py-1.5 text-sm outline-none focus:border-primary/40 focus:ring-2 focus:ring-primary/10"
           />
         </Field>
@@ -61,6 +59,8 @@ export function AddConnectionModal({
           </p>
         </Field>
 
+        {/* Color tag — deferred. Re-enable with the COLORS constant + a `color` state,
+            and pass `color` to addConnection() in submit().
         <Field label="Color">
           <div className="flex items-center gap-2">
             {COLORS.map((c) => (
@@ -78,6 +78,7 @@ export function AddConnectionModal({
             ))}
           </div>
         </Field>
+        */}
 
         {error && <p className="rounded-md bg-destructive/10 px-2.5 py-1.5 text-xs text-destructive">{error}</p>}
 
