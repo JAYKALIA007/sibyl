@@ -6,9 +6,10 @@
 // Everything else (NL→SQL, pg, Ollama, onboarding) is TypeScript. The sidecar owns
 // /api only; the UI reaches it at 127.0.0.1:<SIDECAR_PORT>.
 //
-// SPIKE SCOPE: the sidecar is run via the system `node` for now. Shipping without a
-// system Node (Node SEA → a bundled binary, or an embedded runtime) is the next step
-// — see SPIKE.md. Everything below is production-shaped regardless.
+// The sidecar runs on a Node runtime BUNDLED into the app (resources/bin/node), so the
+// shipped app is self-contained — apps launched from Finder don't inherit the shell
+// PATH and can't rely on a system `node`. In dev (resources aren't bundled) we fall
+// back to `node` on PATH.
 
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
@@ -16,8 +17,8 @@ use std::process::{Child, Command};
 use std::sync::Mutex;
 use tauri::{Manager, RunEvent};
 
-// Fixed loopback port for the spike. Hardening step: pick a free port and hand it to
-// the frontend at runtime (window global / Tauri command) — see SPIKE.md.
+// Fixed loopback port. Hardening step: pick a free port and hand it to the frontend
+// at runtime (window global / Tauri command) instead of baking it — see README.
 const SIDECAR_PORT: &str = "47821";
 
 // Holds the sidecar child so we can kill it on exit (a leaked Node process would keep
@@ -25,13 +26,19 @@ const SIDECAR_PORT: &str = "47821";
 struct Sidecar(Mutex<Option<Child>>);
 
 fn spawn_sidecar(app: &tauri::App) -> Result<Child, Box<dyn std::error::Error>> {
-    // The bundled server script, shipped as a Tauri resource (see tauri.conf.json).
-    let script = app
-        .path()
-        .resource_dir()?
-        .join("sidecar/sibyl-server.mjs");
+    // Both shipped as Tauri resources (see tauri.conf.json).
+    let resource_dir = app.path().resource_dir()?;
+    let script = resource_dir.join("sidecar/sibyl-server.mjs");
+    let bundled_node = resource_dir.join("bin/node");
 
-    let child = Command::new("node")
+    // Prefer the bundled runtime; fall back to a PATH `node` in dev.
+    let mut command = if bundled_node.exists() {
+        Command::new(&bundled_node)
+    } else {
+        Command::new("node")
+    };
+
+    let child = command
         .arg(&script)
         .env("SIBYL_PORT", SIDECAR_PORT)
         // The desktop shell serves the UI itself — the sidecar exposes ONLY /api.

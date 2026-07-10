@@ -36,6 +36,9 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "resources": ["sidecar/sibyl-server.mjs"]
+    "resources": ["sidecar/sibyl-server.mjs", "bin/node"],
+    "macOS": {
+      "signingIdentity": "-"
+    }
   }
 }
