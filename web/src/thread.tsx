@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   ThreadPrimitive,
   MessagePrimitive,
@@ -14,6 +14,8 @@ import { AssistantAnswer } from './AssistantAnswer'
 import { CommandAnswer } from './CommandAnswer'
 import { matchCommands, type Command } from './commands'
 import { SparkleIcon, SendIcon } from './components/icons'
+import { SibylMark } from './SibylMark'
+import { PHASE_COPY, TIMING, resolveTarget, type Stage } from './suggestionStage'
 import type { AskResult, CommandResult, Meta } from './types'
 
 export function Thread({ meta, suggestions }: { meta: Meta | null; suggestions: string[] | null }) {
@@ -55,38 +57,108 @@ function StatusBar({ meta }: { meta: Meta | null }) {
   )
 }
 
+// Drives the cook → ready → reveal choreography from the `suggestions` prop
+// (null = generating, [] = failed/empty, string[] = ready). The pure routing +
+// timings live in suggestionStage.ts; this hook is just the timer wiring.
+function useSuggestionStage(suggestions: string[] | null): Stage {
+  const [stage, setStage] = useState<Stage>(() =>
+    suggestions === null ? 'grace' : suggestions.length ? 'revealed' : 'fallback',
+  )
+  const cookStartRef = useRef(0)
+  const loading = suggestions === null
+
+  // (Re)start the choreography each time we enter a load — e.g. a connection switch
+  // sets suggestions back to null. Hold off any cooking UI until the grace window
+  // elapses, so cache hits (which resolve almost instantly) never show it.
+  useEffect(() => {
+    if (!loading) return
+    setStage('grace')
+    cookStartRef.current = 0
+    const t = setTimeout(() => {
+      cookStartRef.current = Date.now()
+      setStage('cooking-1')
+    }, TIMING.grace)
+    return () => clearTimeout(t)
+  }, [loading])
+
+  // cooking-1 → cooking-2.
+  useEffect(() => {
+    if (stage !== 'cooking-1') return
+    const t = setTimeout(() => setStage('cooking-2'), TIMING.phase1)
+    return () => clearTimeout(t)
+  }, [stage])
+
+  // the "Ready" beat → reveal.
+  useEffect(() => {
+    if (stage !== 'ready') return
+    const t = setTimeout(() => setStage('revealed'), TIMING.ready)
+    return () => clearTimeout(t)
+  }, [stage])
+
+  // Suggestions resolved — route based on where we are, but never before the minimum
+  // cook time (so "Ready" doesn't stutter in on an early resolve).
+  useEffect(() => {
+    if (suggestions === null) return
+    if (stage === 'revealed' || stage === 'fallback' || stage === 'ready') return
+    const target = resolveTarget(stage, suggestions)
+    if (target === 'revealed') {
+      setStage('revealed') // cache hit: straight in, no beat
+      return
+    }
+    const elapsed = cookStartRef.current ? Date.now() - cookStartRef.current : TIMING.minCook
+    const remaining = Math.max(0, TIMING.minCook - elapsed)
+    const t = setTimeout(() => setStage(target), remaining)
+    return () => clearTimeout(t)
+  }, [suggestions, stage])
+
+  return stage
+}
+
 function EmptyState({ suggestions }: { suggestions: string[] | null }) {
+  const stage = useSuggestionStage(suggestions)
+
+  const subcopy =
+    stage === 'cooking-1' || stage === 'cooking-2'
+      ? PHASE_COPY[stage]
+      : stage === 'ready'
+        ? 'Ready'
+        : stage === 'fallback'
+          ? 'Ask anything about your data — or type / for commands.'
+          : 'Plain English in, SQL and answers out.'
+
   return (
     <div className="flex flex-col items-center gap-3 py-16 text-center">
-      <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary text-primary-foreground">
-        <SparkleIcon className="text-lg" />
-      </div>
+      <SibylMark stage={stage} />
       <div>
         <h1 className="text-xl font-semibold">Ask your database</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Plain English in, SQL and answers out.
+        <p
+          aria-live="polite"
+          className={cn(
+            'mt-1 text-sm transition-colors',
+            stage === 'ready' ? 'font-medium text-primary' : 'text-muted-foreground',
+          )}
+        >
+          {subcopy}
         </p>
       </div>
-      <div className="mt-2 grid w-full max-w-lg grid-cols-1 gap-2 sm:grid-cols-2">
-        {suggestions === null
-          ? // loading: schema-aware questions are being generated
-            Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="h-[52px] animate-pulse rounded-lg border border-border bg-muted/40" />
-            ))
-          : suggestions.map((q) => (
-              <ThreadPrimitive.Suggestion
-                key={q}
-                prompt={q}
-                send
-                className={cn(
-                  'rounded-lg border border-border bg-card px-3 py-2 text-left text-sm text-foreground/90',
-                  'transition-colors hover:border-foreground/20 hover:bg-muted',
-                )}
-              >
-                {q}
-              </ThreadPrimitive.Suggestion>
-            ))}
-      </div>
+      {stage === 'revealed' && suggestions && suggestions.length > 0 && (
+        <div className="mt-2 grid w-full max-w-lg grid-cols-1 gap-2 sm:grid-cols-2">
+          {suggestions.map((q, i) => (
+            <ThreadPrimitive.Suggestion
+              key={q}
+              prompt={q}
+              send
+              style={{ animationDelay: `${i * TIMING.cascadeStep}ms` }}
+              className={cn(
+                'sibyl-rise rounded-lg border border-border bg-card px-3 py-2 text-left text-sm text-foreground/90',
+                'transition-colors hover:border-foreground/20 hover:bg-muted',
+              )}
+            >
+              {q}
+            </ThreadPrimitive.Suggestion>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
