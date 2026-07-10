@@ -80,7 +80,7 @@ export function Onboarding({ setup, onReady }: { setup: Setup; onReady: () => vo
             n={2}
             state={step2}
             title="Pull the model"
-            desc="Downloads the SQL model (~1 GB, one time). Run this in your terminal:"
+            desc="Downloads the SQL model (~4.7 GB, one time). Run this in your terminal:"
           >
             {step2 !== 'done' && <CommandBlock command={pullCommand} />}
           </Step>
