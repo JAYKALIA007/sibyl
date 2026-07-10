@@ -248,7 +248,7 @@ async function repl(): Promise<void> {
 
     if (question === '.schema') {
       const stopSpinner = startSpinner('Reloading schema…')
-      const ddl = await loadSchema(true)
+      const ddl = await loadSchema(undefined, true)
       stopSpinner()
       console.log('\n' + c.dim(ddl) + '\n')
       continue

@@ -1,6 +1,8 @@
+import { ThreadPrimitive } from '@assistant-ui/react'
 import type { AskResult, AskUsage } from './types'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from './components/ui/table'
 import { CopyButton } from './components/CopyButton'
+import { cn } from './lib/utils'
 import { toCsv } from './csv'
 
 const DISPLAY_ROW_CAP = 20
@@ -8,9 +10,19 @@ const DISPLAY_ROW_CAP = 20
 export function AssistantAnswer({ result }: { result: AskResult }) {
   if (result.kind === 'refused') {
     return (
-      <div className="flex items-start gap-2 rounded-md bg-amber-500/10 px-3 py-2 text-sm text-amber-700 dark:text-amber-400">
-        <span aria-hidden className="mt-px">⚠</span>
-        <p>{result.reason}</p>
+      <div className="flex flex-col gap-2 rounded-md bg-amber-500/10 px-3 py-2 text-sm">
+        <div className="flex items-start gap-2 text-amber-700 dark:text-amber-400">
+          <span aria-hidden className="mt-px">⚠</span>
+          <p>{result.reason}</p>
+        </div>
+        <div className="flex flex-wrap items-center gap-1.5 pl-6 text-xs text-muted-foreground">
+          <span>Try</span>
+          <RefusalChip prompt="/tables">the tables</RefusalChip>
+          <RefusalChip prompt="/schema">the schema</RefusalChip>
+          <span>
+            or type <code className="rounded bg-muted px-1 font-mono text-foreground">/sql …</code> to query directly.
+          </span>
+        </div>
       </div>
     )
   }
@@ -36,6 +48,23 @@ export function AssistantAnswer({ result }: { result: AskResult }) {
       <ResultTable columns={result.columns} rows={result.rows} />
       <Meter usage={result.usage} rowCount={result.rows.length} attempts={result.attempts} />
     </div>
+  )
+}
+
+// A tiny chip that sends a slash command (e.g. /schema) when a question is refused —
+// turning the dead-end into a next step.
+function RefusalChip({ prompt, children }: { prompt: string; children: React.ReactNode }) {
+  return (
+    <ThreadPrimitive.Suggestion
+      prompt={prompt}
+      send
+      className={cn(
+        'rounded-md border border-border bg-card px-1.5 py-0.5 font-medium text-foreground/80',
+        'transition-colors hover:border-foreground/20 hover:bg-muted',
+      )}
+    >
+      {children}
+    </ThreadPrimitive.Suggestion>
   )
 }
 

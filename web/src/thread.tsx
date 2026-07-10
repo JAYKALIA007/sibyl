@@ -184,6 +184,11 @@ function Composer() {
       assistant.threads.switchToNewThread()
       return
     }
+    if (cmd.takesArg) {
+      // '/sql' — prime the composer and let the user type the query; don't send yet.
+      composer.setText(cmd.name + ' ')
+      return
+    }
     // setText is flushed synchronously (flushTapSync), so send() sees the command.
     composer.setText(cmd.name)
     composer.send()

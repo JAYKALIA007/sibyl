@@ -8,10 +8,14 @@ import { generate } from './ollama.ts'
 const COUNT = 4
 
 const SYSTEM = `You suggest example questions for a natural-language database tool.
-Given a SQL schema, output exactly ${COUNT} short, everyday questions a user could ask
-about THIS specific data. Cover variety: a simple count, a ranking or "top N", a
-relationship across two tables, and a filter. Keep each under 12 words. Return ONLY a
-JSON array of ${COUNT} strings — no markdown, no explanation.`
+Given a SQL schema (CREATE TABLE statements), output exactly ${COUNT} short, natural
+questions a user could ask about THIS specific data. Rules:
+- Use the ACTUAL table and column names from the schema — never generic placeholders.
+- Cover a spread of shapes: one simple count, one ranking or "top N", one question
+  that JOINs two related tables (follow a FOREIGN KEY), and one filter or aggregate.
+- Favour questions that reveal something interesting, not just "how many rows".
+- Each under 12 words, phrased the way a person would actually ask.
+Return ONLY a JSON array of ${COUNT} strings — no markdown, no explanation.`
 
 // Pure: pull the model's reply into a clean list of questions. Handles a JSON array
 // (preferred) or a bulleted/numbered list (fallback), stripping list markers.
@@ -40,22 +44,32 @@ export function tableNames(ddl: string): string[] {
   return [...ddl.matchAll(/CREATE TABLE (\w+)/g)].map((m) => m[1])
 }
 
-// Pure: deterministic questions when the model is unavailable or unparseable.
+// Pure: deterministic questions when the model is unavailable or unparseable. Only
+// table names are known here (no columns), so these stay schema-safe — but at least
+// lead with a look-at-the-data prompt rather than four row-counts in a row.
 export function fallbackSuggestions(ddl: string): string[] {
   const tables = tableNames(ddl).slice(0, COUNT)
   if (tables.length === 0) return ['How many rows are in each table?']
-  return tables.map((t) => `How many rows are in the ${t} table?`)
+  const [first, ...rest] = tables
+  return [
+    `Show 10 rows from the ${first} table`,
+    ...rest.map((t) => `How many rows are in the ${t} table?`),
+  ]
 }
 
-let cache: string[] | null = null
-let inflight: Promise<string[]> | null = null
+// Cached per connection (`key`) — with multiple saved DBs, a single global cache
+// would serve the first database's questions for every other one. Concurrent
+// callers for the same key share the one in-flight request.
+const cache = new Map<string, string[]>()
+const inflight = new Map<string, Promise<string[]>>()
 
-// Generate once per process (the schema is fixed for a session) and cache it;
-// concurrent callers share the one in-flight request.
-export async function getSuggestions(ddl: string): Promise<string[]> {
-  if (cache) return cache
-  if (!inflight) {
-    inflight = (async () => {
+export async function getSuggestions(ddl: string, key = '__env__'): Promise<string[]> {
+  const cached = cache.get(key)
+  if (cached) return cached
+
+  let pending = inflight.get(key)
+  if (!pending) {
+    pending = (async () => {
       try {
         const raw = await generate(ddl, { system: SYSTEM, temperature: 0.5 })
         const qs = parseSuggestions(raw)
@@ -64,10 +78,11 @@ export async function getSuggestions(ddl: string): Promise<string[]> {
         return fallbackSuggestions(ddl)
       }
     })().then((r) => {
-      cache = r
-      inflight = null
+      cache.set(key, r)
+      inflight.delete(key)
       return r
     })
+    inflight.set(key, pending)
   }
-  return inflight
+  return pending
 }

@@ -8,8 +8,10 @@
 import { getSchema, toDDL } from './introspect.ts'
 import { toSql, NO_ANSWER, type Turn } from './nl2sql.ts'
 import { guard } from './guard.ts'
-import { runQuery } from './db.ts'
+import { runQuery, type Conn } from './db.ts'
 import { generate, NUM_CTX, type Usage } from './ollama.ts'
+
+export type { Conn }
 
 export type { Turn }
 
@@ -25,11 +27,14 @@ export type AskResult =
 const MAX_ATTEMPTS = 3
 const SUMMARY_ROW_CAP = 50
 
-// Schema is stable within a session — fetch the DDL once and reuse it.
-let cachedDDL: string | null = null
-export async function loadSchema(force = false): Promise<string> {
-  if (!cachedDDL || force) cachedDDL = toDDL(await getSchema())
-  return cachedDDL
+// Schema is stable within a session — fetch the DDL once per connection and reuse
+// it. Cached by connection id so switching DBs in the GUI doesn't re-introspect a
+// database we've already seen (and never serves one DB's schema for another).
+const ddlCache = new Map<string, string>()
+export async function loadSchema(conn?: Conn, force = false): Promise<string> {
+  const key = conn?.id ?? '__env__'
+  if (force || !ddlCache.has(key)) ddlCache.set(key, toDDL(await getSchema(conn)))
+  return ddlCache.get(key)!
 }
 
 // A second, small LLM call: turn the result rows into a one-line answer. Capped so a
@@ -49,11 +54,26 @@ async function summarize(question: string, rows: any[], columns: string[]): Prom
   return out.trim()
 }
 
+// Run raw user-written SQL (the GUI's /sql escape hatch) — same read-only guard as
+// the model's SQL, so it can only ever SELECT. No LLM: deterministic, no summary.
+export type SqlOutcome =
+  | { kind: 'sql'; sql: string; columns: string[]; rows: any[] }
+  | { kind: 'rejected'; reason: string }
+  | { kind: 'error'; error: string }
+
+export async function runSql(sql: string, conn?: Conn): Promise<SqlOutcome> {
+  const g = guard(sql)
+  if (!g.ok) return { kind: 'rejected', reason: g.reason }
+  const res = await runQuery(g.sql, conn)
+  if ('error' in res) return { kind: 'error', error: res.error }
+  return { kind: 'sql', sql: g.sql, columns: res.columns, rows: res.rows }
+}
+
 // `history` is the surface's conversation buffer (prior successful turns). The core
 // itself holds NO conversation state — each surface owns and passes its own, so the
 // same core can serve many concurrent sessions (see docs/adr/0001).
-export async function ask(question: string, history: Turn[] = []): Promise<AskResult> {
-  const ddl = await loadSchema()
+export async function ask(question: string, history: Turn[] = [], conn?: Conn): Promise<AskResult> {
+  const ddl = await loadSchema(conn)
 
   let feedback: { sql: string; error: string } | undefined
   let attempts = 0
@@ -72,7 +92,7 @@ export async function ask(question: string, history: Turn[] = []): Promise<AskRe
       continue // let the model try to fix it
     }
 
-    const res = await runQuery(g.sql)
+    const res = await runQuery(g.sql, conn)
     if ('error' in res) {
       feedback = { sql: g.sql, error: res.error } // feed the Postgres error back
       continue

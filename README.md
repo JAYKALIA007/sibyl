@@ -223,6 +223,15 @@ A browser front-end (React + shadcn + assistant-ui) over the same engine.
 pnpm start        # builds web/ and serves the app + API at http://127.0.0.1:3001
 ```
 
+**Multiple connections:** the left sidebar holds any number of saved databases —
+add one (name + URL, validated before saving), switch between them without
+restarting, rename or delete. Switching starts a fresh conversation (a different
+schema is a different context). Saved connections live in `~/.sibyl/connections.json`
+(`0600`); the raw URL stays server-side and the UI only ever shows a password-free
+`user@host/db` label. Your existing `.env` `DATABASE_URL` is seeded as the first
+connection. Type `/` in the composer for the built-in commands (`/schema`,
+`/tables`, `/help`, `/new`).
+
 **Develop it (two processes, hot reload):**
 
 ```bash

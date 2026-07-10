@@ -5,7 +5,7 @@
 // toDDL is a DEEP, PURE module (metadata in → DDL string out, no I/O) so it can be
 // unit-tested in isolation. getSchema is the impure half that hits the live DB.
 
-import { runQuery, close } from './db.ts'
+import { runQuery, close, type Conn } from './db.ts'
 
 export type Column = { name: string; type: string; notNull: boolean }
 export type ForeignKey = { column: string; refTable: string; refColumn: string }
@@ -34,12 +34,12 @@ export function toDDL(schema: Schema): string {
 }
 
 // IMPURE: read the live schema of the `public` tables via information_schema.
-export async function getSchema(): Promise<Schema> {
+export async function getSchema(conn?: Conn): Promise<Schema> {
   const cols = await runQuery(`
     SELECT table_name, column_name, data_type, is_nullable, ordinal_position
     FROM information_schema.columns
     WHERE table_schema = 'public'
-    ORDER BY table_name, ordinal_position`)
+    ORDER BY table_name, ordinal_position`, conn)
 
   // Constraints via pg_catalog — readable by any role. (information_schema hides
   // constraints from a SELECT-only role, so PKs/FKs would come back empty there.)
@@ -61,7 +61,7 @@ export async function getSchema(): Promise<Schema> {
     LEFT JOIN LATERAL unnest(con.confkey) WITH ORDINALITY AS fk(attnum, ord) ON fk.ord = k.ord
     LEFT JOIN pg_attribute fa ON fa.attrelid = con.confrelid AND fa.attnum = fk.attnum
     WHERE con.contype IN ('p', 'f')
-    ORDER BY cl.relname, con.conname, k.ord`)
+    ORDER BY cl.relname, con.conname, k.ord`, conn)
 
   for (const r of [cols, cons]) if ('error' in r) throw new Error(r.error)
 
