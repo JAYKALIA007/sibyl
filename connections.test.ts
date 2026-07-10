@@ -8,6 +8,9 @@ import {
   upsertConnection,
   removeConnection,
   renameConnection,
+  createRegistry,
+  type RegistryStore,
+  type ProbeFn,
 } from './connections.ts'
 
 test('connectionLabel is password-free and strips query params', () => {
@@ -107,4 +110,84 @@ test('renameConnection changes only the target name', () => {
   const out = renameConnection(list, 'b', 'Beta')
   assert.equal(out.find((c) => c.id === 'b')?.name, 'Beta')
   assert.equal(out.find((c) => c.id === 'a')?.name, 'A')
+})
+
+// ── registry shell, over an in-memory store + fake probe ──────────────────────────
+
+function memStore(initial: string | null = null): RegistryStore & { dump: () => string | null } {
+  let data = initial
+  return { read: () => data, write: (t) => { data = t }, dump: () => data }
+}
+const okProbe: ProbeFn = async () => ({ ok: true, tableCount: 3 })
+const failProbe: ProbeFn = async () => ({ ok: false, error: 'getaddrinfo ENOTFOUND db.example.co' })
+function seqUuid() {
+  let n = 0
+  return () => `id-${++n}`
+}
+
+test('registry seeds `default` from DATABASE_URL into an empty store and persists it', () => {
+  const store = memStore(null)
+  const reg = createRegistry({ store, probe: okProbe, databaseUrl: 'postgresql://u:p@h/db', uuid: seqUuid() })
+  const list = reg.listConnections()
+  assert.equal(list.length, 1)
+  assert.equal(list[0].id, 'default')
+  assert.ok(store.dump()?.includes('default')) // written back, so it survives re-reads
+})
+
+test('registry does not seed without a DATABASE_URL', () => {
+  const reg = createRegistry({ store: memStore(null), probe: okProbe, uuid: seqUuid() })
+  assert.deepEqual(reg.listConnections(), [])
+})
+
+test('registry tolerates a corrupt store as empty (no throw, no silent crash)', () => {
+  const reg = createRegistry({ store: memStore('not json {['), probe: okProbe, uuid: seqUuid() })
+  assert.deepEqual(reg.listConnections(), [])
+})
+
+test('addConnection does NOT persist when the probe fails, and returns a classified hint', async () => {
+  const store = memStore('[]')
+  const reg = createRegistry({ store, probe: failProbe, uuid: seqUuid() })
+  const r = await reg.addConnection({ url: 'postgresql://u:p@db.example.co/db' })
+  assert.equal(r.ok, false)
+  if (!r.ok) assert.match(r.hint, /host/i)
+  assert.equal(reg.listConnections().length, 0)
+})
+
+test('addConnection persists on a good probe and is then findable', async () => {
+  const store = memStore('[]')
+  const reg = createRegistry({ store, probe: okProbe, uuid: seqUuid() })
+  const r = await reg.addConnection({ name: 'Prod', url: 'postgresql://u:secret@h/db', color: '#f59e0b' })
+  assert.equal(r.ok, true)
+  if (r.ok) {
+    assert.equal(r.tables, 3)
+    assert.equal(r.view.name, 'Prod')
+    assert.equal(r.view.color, '#f59e0b')
+    assert.ok(!JSON.stringify(r.view).includes('secret')) // view never leaks the URL
+  }
+  const list = reg.listConnections()
+  assert.equal(list.length, 1)
+  assert.equal(reg.findConnection(list[0].id)?.url, 'postgresql://u:secret@h/db')
+})
+
+test('rename persists and returns the view; an unknown id is a no-op', async () => {
+  const store = memStore('[]')
+  const reg = createRegistry({ store, probe: okProbe, uuid: seqUuid() })
+  await reg.addConnection({ url: 'postgresql://u:p@h/db' })
+  const id = reg.listConnections()[0].id
+
+  assert.equal(reg.renameConnectionById(id, 'Renamed')?.name, 'Renamed')
+  assert.equal(reg.findConnection(id)?.name, 'Renamed')
+
+  const before = store.dump()
+  assert.equal(reg.renameConnectionById('nope', 'x'), undefined)
+  assert.equal(store.dump(), before) // untouched
+})
+
+test('delete removes the connection from the store', async () => {
+  const store = memStore('[]')
+  const reg = createRegistry({ store, probe: okProbe, uuid: seqUuid() })
+  await reg.addConnection({ url: 'postgresql://u:p@h/db' })
+  const id = reg.listConnections()[0].id
+  reg.deleteConnectionById(id)
+  assert.equal(reg.listConnections().length, 0)
 })
