@@ -59,7 +59,7 @@ export function SendIcon({ className }: IconProps) {
 export function SparkleIcon({ className }: IconProps) {
   return (
     <svg {...base} className={className} aria-hidden>
-      <path d="M12 3v4m0 10v4m9-9h-4M7 12H3m13.5-4.5-2.8 2.8M9.3 14.7l-2.8 2.8m11 0-2.8-2.8M9.3 9.3 6.5 6.5" />
+      <path d="M12 9V5.25M14.1 9.9 16.8 7.2M15 12H18.75M14.1 14.1 16.8 16.8M12 15V18.75M9.9 14.1 7.2 16.8M9 12H5.25M9.9 9.9 7.2 7.2" />
     </svg>
   )
 }

@@ -87,6 +87,110 @@ button:disabled {
   border-radius: 4px;
 }
 
+/* ── Starter-question choreography (see suggestionStage.ts / SibylMark.tsx) ───── */
+
+/* The mark constructs itself: the whole sparkle spins into place while its 8 rays
+   draw outward from the centre, staggered so the draw sweeps around. */
+@keyframes sibyl-form {
+  from { transform: scale(0.5) rotate(-50deg); opacity: 0.15; }
+  to { transform: scale(1) rotate(0deg); opacity: 1; }
+}
+@keyframes sibyl-draw {
+  from { stroke-dashoffset: 1; }
+  to { stroke-dashoffset: 0; }
+}
+.mark-grp {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: sibyl-form 0.9s cubic-bezier(0.34, 1.4, 0.5, 1) both;
+}
+.mark-ray {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 0; /* drawn by default; the animation draws it in */
+  animation: sibyl-draw 0.5s ease both;
+  animation-delay: calc(var(--i) * 60ms);
+}
+
+/* A light sweep across the tile while it's drafting questions (cooking-2). */
+@keyframes sibyl-shim {
+  to { transform: translateX(320%) skewX(-18deg); }
+}
+.mark-shim {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: inherit;
+  pointer-events: none;
+}
+.mark-shim::before {
+  content: '';
+  position: absolute;
+  top: -30%;
+  left: 0;
+  height: 160%;
+  width: 45%;
+  background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.5), transparent);
+  transform: translateX(-160%) skewX(-18deg);
+  animation: sibyl-shim 1.2s linear infinite;
+}
+
+/* The satisfying "done!" pop + expanding ring + one-shot spark burst on ready. */
+@keyframes sibyl-bloom {
+  0% { transform: scale(1); }
+  45% { transform: scale(1.24); }
+  100% { transform: scale(1); }
+}
+.mark[data-ready='true'] .mark-svg { animation: sibyl-bloom 0.5s ease; }
+
+@keyframes sibyl-ring {
+  from { transform: scale(0.7); opacity: 0.5; }
+  to { transform: scale(1.7); opacity: 0; }
+}
+.mark-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  border: 2px solid var(--primary);
+  animation: sibyl-ring 0.6s ease-out both;
+}
+
+@keyframes sibyl-burst {
+  from { opacity: 1; transform: translate(0, 0) scale(1); }
+  to { opacity: 0; transform: translate(var(--dx), var(--dy)) scale(0.3); }
+}
+.mark-spark {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  height: 4px;
+  width: 4px;
+  margin: -2px;
+  border-radius: 9999px;
+  background: var(--primary);
+  animation: sibyl-burst 0.55s ease-out both;
+}
+
+/* Cards cascading in on reveal (per-card delay set inline). */
+@keyframes sibyl-rise {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.sibyl-rise { animation: sibyl-rise 0.32s ease-out both; }
+
+/* Honour reduced-motion: keep the information (the built mark, phase text, "Ready",
+   the questions), drop all the movement. */
+@media (prefers-reduced-motion: reduce) {
+  .mark-grp, .mark-ray, .sibyl-rise { animation: none; }
+  .mark[data-ready='true'] .mark-svg { animation: none; }
+  .sibyl-rise { opacity: 1; transform: none; }
+  .mark-shim, .mark-ring, .mark-spark { display: none; }
+}
+
 /* Subtle, unobtrusive scrollbars that fade into the surface. */
 * {
   scrollbar-width: thin;
