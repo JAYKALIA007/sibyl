@@ -1,8 +1,8 @@
 // First-run onboarding. Sibyl needs a local LLM (Ollama + a pulled model) before it
 // can turn questions into SQL, and the desktop shell boots the UI before that's
-// necessarily true. This gates the app, walks the user through install → pull →
-// connect, and polls GET /api/setup so it auto-advances (and dismisses) the moment
-// the model is ready — no manual refresh needed.
+// necessarily true. This gates the app and walks the user through install → pull →
+// connect. Status (GET /api/setup) is checked once on load; the user re-checks
+// explicitly via "Check again" after installing/pulling — we don't poll in a loop.
 
 import { useEffect, useState } from 'react'
 import { getSetup } from './api'
@@ -10,7 +10,6 @@ import { CheckIcon, CopyIcon, SparkleIcon } from './components/icons'
 import type { Setup } from './types'
 
 const OLLAMA_DOWNLOAD = 'https://ollama.com/download'
-const POLL_MS = 3000
 
 type StepState = 'done' | 'active' | 'pending'
 
@@ -18,14 +17,10 @@ export function Onboarding({ setup, onReady }: { setup: Setup; onReady: () => vo
   const [current, setCurrent] = useState<Setup>(setup)
   const [checking, setChecking] = useState(false)
 
-  // Poll until ready. A manual "Check again" shares the same refresh path.
+  // Dismiss the gate once the model is ready. No polling — `current` starts from the
+  // one check App did on load and only changes when the user clicks "Check again".
   useEffect(() => {
-    if (current.ready) {
-      onReady()
-      return
-    }
-    const id = setInterval(refresh, POLL_MS)
-    return () => clearInterval(id)
+    if (current.ready) onReady()
   }, [current.ready]) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function refresh() {
@@ -105,7 +100,9 @@ export function Onboarding({ setup, onReady }: { setup: Setup; onReady: () => vo
             {checking ? 'Checking…' : 'Check again'}
           </button>
           <span className="text-xs text-muted-foreground">
-            {reachable ? 'Waiting for the model…' : 'Waiting for Ollama…'} checks automatically
+            {reachable
+              ? 'Pulled the model? Click Check again.'
+              : 'Installed & started Ollama? Click Check again.'}
           </span>
         </div>
       </div>
