@@ -4,8 +4,9 @@ import { SibylRuntimeProvider } from './runtime'
 import { Thread } from './thread'
 import { Sidebar } from './Sidebar'
 import { AddConnectionModal } from './AddConnectionModal'
+import { Onboarding } from './Onboarding'
 import { faultBus } from './faults'
-import { getMeta, getSuggestions, listConnections } from './api'
+import { getMeta, getSetup, getSuggestions, listConnections } from './api'
 import {
   resolveActiveConnection,
   getStoredActiveId,
@@ -13,17 +14,23 @@ import {
 } from './connections'
 import { currentTheme, setTheme, type Theme } from './theme'
 import { PlusIcon, DatabaseIcon, SidebarIcon } from './components/icons'
-import type { ConnectionView, Meta } from './types'
+import type { ConnectionView, Meta, Setup } from './types'
 
 const COLLAPSE_KEY = 'sibyl-sidebar-collapsed'
 
 export function App() {
   const [theme, setThemeState] = useState<Theme>(currentTheme)
+  // null = still probing the local LLM; gates the app behind onboarding until ready.
+  const [setup, setSetup] = useState<Setup | null>(null)
   // null = still loading the registry; [] = loaded, none saved.
   const [connections, setConnections] = useState<ConnectionView[] | null>(null)
   const [activeId, setActiveId] = useState<string | null>(null)
   const [meta, setMeta] = useState<Meta | null>(null)
   const [suggestions, setSuggestions] = useState<string[] | null>(null)
+
+  useEffect(() => {
+    getSetup().then(setSetup)
+  }, [])
 
   useEffect(() => {
     listConnections().then((list) => {
@@ -48,6 +55,11 @@ export function App() {
     const next: Theme = theme === 'dark' ? 'light' : 'dark'
     setTheme(next)
     setThemeState(next)
+  }
+
+  if (setup === null) return null // brief probe of the local LLM before first paint
+  if (!setup.ready) {
+    return <Onboarding setup={setup} onReady={() => getSetup().then(setSetup)} />
   }
 
   return (

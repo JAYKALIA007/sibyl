@@ -7,6 +7,7 @@
 // `conn` uses the process-wide DATABASE_URL pool — the CLI/eval path, unchanged.
 
 import pg from 'pg'
+import { isMain } from './isMain.ts'
 
 const { Pool } = pg
 
@@ -103,7 +104,7 @@ export async function close(): Promise<void> {
 }
 
 // Self-test: `npm run db:check` — proves connectivity, the seed, and read-only.
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (isMain(import.meta.url)) {
   const one = await runQuery('SELECT 1 AS ok')
   console.log('SELECT 1  →', one)
 

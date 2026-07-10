@@ -4,6 +4,7 @@
 // answered from the schema (the core engine turns that into a graceful refusal).
 
 import { generateWithUsage, type Usage } from './ollama.ts'
+import { isMain } from './isMain.ts'
 
 export const NO_ANSWER = 'NO_ANSWER'
 
@@ -66,7 +67,7 @@ export async function toSql(
 
 // `npm run nl2sql:check` — generate SQL for sample questions against the live schema
 // and run them, to eyeball quality end-to-end.
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (isMain(import.meta.url)) {
   const { getSchema, toDDL } = await import('./introspect.ts')
   const { guard } = await import('./guard.ts')
   const { runQuery, close } = await import('./db.ts')
