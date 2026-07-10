@@ -11,7 +11,7 @@ import express from 'express'
 import { existsSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { ask, loadSchema, type Turn, type Conn } from './core.ts'
+import { ask, runSql, loadSchema, type Turn, type Conn } from './core.ts'
 import { close, closePool, runQuery } from './db.ts'
 import { checkOllama, CHAT_MODEL, OLLAMA } from './ollama.ts'
 import { getSuggestions } from './suggestions.ts'
@@ -51,13 +51,17 @@ app.get('/api/connections', (_req, res) => {
 })
 
 app.post('/api/connections', async (req, res) => {
-  const { name, url } = (req.body ?? {}) as { name?: unknown; url?: unknown }
+  const { name, url, color } = (req.body ?? {}) as { name?: unknown; url?: unknown; color?: unknown }
   if (typeof url !== 'string' || !url.trim()) {
     res.status(400).json({ kind: 'fault', error: 'url (non-empty string) is required' })
     return
   }
   // Probe-before-save: a bad URL returns a classified hint and is NOT persisted.
-  const result = await addConnection({ name: typeof name === 'string' ? name : undefined, url })
+  const result = await addConnection({
+    name: typeof name === 'string' ? name : undefined,
+    url,
+    color: typeof color === 'string' ? color : undefined,
+  })
   if (!result.ok) {
     res.status(422).json({ kind: 'fault', error: result.hint, detail: result.error })
     return
@@ -166,6 +170,25 @@ app.post('/api/ask', async (req, res) => {
   } catch (err) {
     // A genuine fault (Ollama unreachable, DB dead, core threw) → 5xx, distinct
     // from the three domain outcomes which are all 200.
+    const { status, body } = mapFault(err)
+    res.status(status).json(body)
+  }
+})
+
+// The /sql escape hatch — run raw user SQL through the same read-only guard. No LLM,
+// so all outcomes (rows / rejected-by-guard / DB error) are a plain 200; only a
+// genuine fault (DB unreachable) is a 5xx.
+app.post('/api/sql', async (req, res) => {
+  const { sql, connectionId } = (req.body ?? {}) as { sql?: unknown; connectionId?: unknown }
+  if (typeof sql !== 'string' || !sql.trim()) {
+    res.status(400).json({ kind: 'fault', error: 'sql (non-empty string) is required' })
+    return
+  }
+  const conn = resolveConn(connectionId, res)
+  if (!conn) return
+  try {
+    res.json(await runSql(sql, conn))
+  } catch (err) {
     const { status, body } = mapFault(err)
     res.status(status).json(body)
   }

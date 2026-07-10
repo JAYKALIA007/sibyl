@@ -54,6 +54,21 @@ async function summarize(question: string, rows: any[], columns: string[]): Prom
   return out.trim()
 }
 
+// Run raw user-written SQL (the GUI's /sql escape hatch) — same read-only guard as
+// the model's SQL, so it can only ever SELECT. No LLM: deterministic, no summary.
+export type SqlOutcome =
+  | { kind: 'sql'; sql: string; columns: string[]; rows: any[] }
+  | { kind: 'rejected'; reason: string }
+  | { kind: 'error'; error: string }
+
+export async function runSql(sql: string, conn?: Conn): Promise<SqlOutcome> {
+  const g = guard(sql)
+  if (!g.ok) return { kind: 'rejected', reason: g.reason }
+  const res = await runQuery(g.sql, conn)
+  if ('error' in res) return { kind: 'error', error: res.error }
+  return { kind: 'sql', sql: g.sql, columns: res.columns, rows: res.rows }
+}
+
 // `history` is the surface's conversation buffer (prior successful turns). The core
 // itself holds NO conversation state — each surface owns and passes its own, so the
 // same core can serve many concurrent sessions (see docs/adr/0001).

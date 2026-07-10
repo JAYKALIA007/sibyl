@@ -14,9 +14,9 @@ import { randomUUID } from 'node:crypto'
 import { probeConnection } from './db.ts'
 import { classifyConnError } from './setup.ts'
 
-export type Connection = { id: string; name: string; url: string }
+export type Connection = { id: string; name: string; url: string; color?: string }
 // What the client sees — never the raw URL.
-export type ConnectionView = { id: string; name: string; label: string }
+export type ConnectionView = { id: string; name: string; label: string; color?: string }
 
 const DIR = join(homedir(), '.sibyl')
 const FILE = join(DIR, 'connections.json')
@@ -36,7 +36,12 @@ export function connectionLabel(url: string): string {
 }
 
 export function toView(c: Connection): ConnectionView {
-  return { id: c.id, name: c.name || connectionLabel(c.url), label: connectionLabel(c.url) }
+  return {
+    id: c.id,
+    name: c.name || connectionLabel(c.url),
+    label: connectionLabel(c.url),
+    ...(c.color ? { color: c.color } : {}),
+  }
 }
 
 // Tolerant parse: drop anything that isn't a well-formed {id,url} record.
@@ -46,7 +51,12 @@ export function parseConnections(raw: string): Connection[] {
     if (!Array.isArray(arr)) return []
     return arr
       .filter((c) => c && typeof c.id === 'string' && typeof c.url === 'string')
-      .map((c) => ({ id: c.id, name: typeof c.name === 'string' ? c.name : '', url: c.url }))
+      .map((c) => ({
+        id: c.id,
+        name: typeof c.name === 'string' ? c.name : '',
+        url: c.url,
+        ...(typeof c.color === 'string' ? { color: c.color } : {}),
+      }))
   } catch {
     return []
   }
@@ -109,7 +119,7 @@ export function findConnection(id: string): Connection | undefined {
 
 // Validate (probe) before persisting — never save a connection we can't reach.
 export async function addConnection(
-  input: { name?: string; url: string },
+  input: { name?: string; url: string; color?: string },
 ): Promise<{ ok: true; view: ConnectionView; tables: number } | { ok: false; error: string; hint: string }> {
   const probe = await probeConnection(input.url)
   if (!probe.ok) return { ok: false, error: probe.error, hint: classifyConnError(probe.error) }
@@ -118,6 +128,7 @@ export async function addConnection(
     id: randomUUID(),
     name: input.name?.trim() || connectionLabel(input.url),
     url: input.url,
+    ...(input.color ? { color: input.color } : {}),
   }
   writeConnections(upsertConnection(readConnections(), conn))
   return { ok: true, view: toView(conn), tables: probe.tableCount }

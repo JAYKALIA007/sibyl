@@ -1,18 +1,19 @@
 // The left rail: the app's identity, the list of saved connections (switch, rename,
-// delete), an inline add-connection form, and the theme toggle. Connection
-// switching + adding are disabled while a turn is in flight (a switch resets the
-// thread — see App).
+// delete), an "add connection" trigger (opens a modal — owned by Workspace), and the
+// theme toggle. Connection switching + adding are disabled while a turn is in flight
+// (a switch resets the thread — see App).
 
 import { useState } from 'react'
 import { useThread } from '@assistant-ui/react'
 import { cn } from './lib/utils'
-import { addConnection, renameConnection, deleteConnection } from './api'
+import { renameConnection, deleteConnection } from './api'
 import {
   SparkleIcon,
   DatabaseIcon,
   PlusIcon,
   TrashIcon,
   PencilIcon,
+  SidebarIcon,
   SunIcon,
   MoonIcon,
 } from './components/icons'
@@ -23,10 +24,9 @@ export function Sidebar({
   connections,
   activeId,
   activeTables,
-  addingOpen,
-  setAddingOpen,
+  onOpenAdd,
+  onCollapse,
   onSwitch,
-  onAdded,
   onRenamed,
   onDeleted,
   theme,
@@ -35,10 +35,9 @@ export function Sidebar({
   connections: ConnectionView[]
   activeId: string | null
   activeTables: number | null
-  addingOpen: boolean
-  setAddingOpen: (open: boolean) => void
+  onOpenAdd: () => void
+  onCollapse: () => void
   onSwitch: (id: string) => void
-  onAdded: (connection: ConnectionView) => void
   onRenamed: (view: ConnectionView) => void
   onDeleted: (id: string) => void
   theme: Theme
@@ -49,11 +48,21 @@ export function Sidebar({
 
   return (
     <aside className="flex w-60 shrink-0 flex-col border-r border-border bg-panel">
-      <div className="flex items-center gap-2 px-3 py-3">
-        <span className="flex h-6 w-6 items-center justify-center rounded-md bg-primary text-primary-foreground">
-          <SparkleIcon className="text-sm" />
-        </span>
-        <span className="font-semibold tracking-tight">Sibyl</span>
+      <div className="flex items-center justify-between px-3 py-3">
+        <div className="flex items-center gap-2">
+          <span className="flex h-6 w-6 items-center justify-center rounded-md bg-primary text-primary-foreground">
+            <SparkleIcon className="text-sm" />
+          </span>
+          <span className="font-semibold tracking-tight">Sibyl</span>
+        </div>
+        <button
+          onClick={onCollapse}
+          aria-label="Collapse sidebar"
+          title="Collapse sidebar"
+          className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+        >
+          <SidebarIcon className="text-[15px]" />
+        </button>
       </div>
 
       <div className="flex-1 overflow-y-auto px-2">
@@ -75,21 +84,17 @@ export function Sidebar({
           ))}
         </ul>
 
-        {addingOpen ? (
-          <AddForm busy={busy} onCancel={() => setAddingOpen(false)} onAdded={onAdded} />
-        ) : (
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => setAddingOpen(true)}
-            className={cn(
-              'mt-1 flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm text-muted-foreground',
-              'transition-colors hover:bg-muted hover:text-foreground disabled:opacity-40',
-            )}
-          >
-            <PlusIcon className="text-[15px]" /> Add connection
-          </button>
-        )}
+        <button
+          type="button"
+          disabled={busy}
+          onClick={onOpenAdd}
+          className={cn(
+            'mt-1 flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm text-muted-foreground',
+            'transition-colors hover:bg-muted hover:text-foreground disabled:opacity-40',
+          )}
+        >
+          <PlusIcon className="text-[15px]" /> Add connection
+        </button>
       </div>
 
       <div className="border-t border-border p-2">
@@ -167,16 +172,24 @@ function ConnectionRow({
         onClick={onSwitch}
         title={conn.label}
         className={cn(
-          'flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm transition-colors',
-          active
-            ? 'bg-primary/10 text-foreground'
-            : 'text-foreground/80 hover:bg-muted disabled:opacity-40',
+          'flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left transition-colors',
+          active ? 'bg-primary/10' : 'hover:bg-muted disabled:opacity-40',
         )}
       >
-        <DatabaseIcon className={cn('shrink-0 text-[15px]', active ? 'text-primary' : 'text-muted-foreground')} />
-        <span className="min-w-0 flex-1 truncate">{conn.name}</span>
+        <span
+          className={cn('flex shrink-0 items-center', !conn.color && (active ? 'text-primary' : 'text-muted-foreground'))}
+          {...(conn.color ? { style: { color: conn.color } } : {})}
+        >
+          <DatabaseIcon className="text-[15px]" />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-sm text-foreground">{conn.name}</span>
+          {conn.label !== conn.name && (
+            <span className="block truncate text-[11px] text-muted-foreground">{conn.label}</span>
+          )}
+        </span>
         {active && tables !== null && (
-          <span className="shrink-0 rounded-full bg-primary/15 px-1.5 text-[11px] font-medium text-primary">
+          <span className="shrink-0 self-center rounded-full bg-primary/15 px-1.5 text-[11px] font-medium text-primary">
             {tables}
           </span>
         )}
@@ -195,7 +208,7 @@ function ConnectionRow({
       ) : (
         // Hover actions — hidden until you hover the row (or focus within), never
         // block the label, and disabled while a turn is running.
-        <div className="absolute right-1 top-1 hidden items-center gap-0.5 group-hover:flex group-focus-within:flex">
+        <div className="absolute right-1 top-1.5 hidden items-center gap-0.5 group-hover:flex group-focus-within:flex">
           <IconAction label="Rename" disabled={busy} onClick={() => { setName(conn.name); setMode('rename') }}>
             <PencilIcon className="text-[13px]" />
           </IconAction>
@@ -230,70 +243,5 @@ function IconAction({
     >
       {children}
     </button>
-  )
-}
-
-function AddForm({
-  busy,
-  onCancel,
-  onAdded,
-}: {
-  busy: boolean
-  onCancel: () => void
-  onAdded: (connection: ConnectionView) => void
-}) {
-  const [name, setName] = useState('')
-  const [url, setUrl] = useState('')
-  const [error, setError] = useState<string | null>(null)
-  const [saving, setSaving] = useState(false)
-
-  async function submit() {
-    if (!url.trim() || saving) return
-    setSaving(true)
-    setError(null)
-    const result = await addConnection({ name: name.trim() || undefined, url: url.trim() })
-    setSaving(false)
-    if (result.ok) onAdded(result.connection)
-    else setError(result.error)
-  }
-
-  return (
-    <div className="mt-1 flex flex-col gap-2 rounded-lg border border-border bg-card p-2">
-      <input
-        autoFocus
-        value={name}
-        onChange={(e) => setName(e.target.value)}
-        placeholder="Name (optional)"
-        className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm outline-none focus:border-primary/40 focus:ring-2 focus:ring-primary/10"
-      />
-      <input
-        value={url}
-        onChange={(e) => setUrl(e.target.value)}
-        onKeyDown={(e) => e.key === 'Enter' && submit()}
-        placeholder="postgresql://sibyl_ro:…@host:5432/db"
-        className="w-full rounded-md border border-border bg-background px-2 py-1.5 font-mono text-xs outline-none focus:border-primary/40 focus:ring-2 focus:ring-primary/10"
-      />
-      <p className="px-0.5 text-[11px] leading-snug text-muted-foreground">
-        Use a read-only role (e.g. <code className="font-mono">sibyl_ro</code>) — Sibyl only ever reads.
-      </p>
-      {error && (
-        <p className="rounded-md bg-destructive/10 px-2 py-1 text-xs text-destructive">{error}</p>
-      )}
-      <div className="flex items-center justify-end gap-1.5">
-        <button
-          onClick={onCancel}
-          className="rounded-md px-2 py-1 text-sm text-muted-foreground transition-colors hover:bg-muted"
-        >
-          Cancel
-        </button>
-        <button
-          onClick={submit}
-          disabled={busy || saving || !url.trim()}
-          className="rounded-md bg-primary px-2.5 py-1 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-40"
-        >
-          {saving ? 'Testing…' : 'Add'}
-        </button>
-      </div>
-    </div>
   )
 }

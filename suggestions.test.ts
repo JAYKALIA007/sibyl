@@ -36,10 +36,10 @@ test('reads table names from DDL in order', () => {
   assert.deepEqual(tableNames(ddl), ['users', 'orders'])
 })
 
-test('fallback builds a question per table (capped)', () => {
+test('fallback leads with a sample-rows prompt, then counts (capped)', () => {
   const ddl = 'CREATE TABLE a (x int);\nCREATE TABLE b (x int);'
   assert.deepEqual(fallbackSuggestions(ddl), [
-    'How many rows are in the a table?',
+    'Show 10 rows from the a table',
     'How many rows are in the b table?',
   ])
 })

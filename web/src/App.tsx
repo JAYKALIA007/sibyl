@@ -3,6 +3,7 @@ import { useAssistantRuntime } from '@assistant-ui/react'
 import { SibylRuntimeProvider } from './runtime'
 import { Thread } from './thread'
 import { Sidebar } from './Sidebar'
+import { AddConnectionModal } from './AddConnectionModal'
 import { faultBus } from './faults'
 import { getMeta, getSuggestions, listConnections } from './api'
 import {
@@ -11,8 +12,10 @@ import {
   setStoredActiveId,
 } from './connections'
 import { currentTheme, setTheme, type Theme } from './theme'
-import { PlusIcon, DatabaseIcon } from './components/icons'
+import { PlusIcon, DatabaseIcon, SidebarIcon } from './components/icons'
 import type { ConnectionView, Meta } from './types'
+
+const COLLAPSE_KEY = 'sibyl-sidebar-collapsed'
 
 export function App() {
   const [theme, setThemeState] = useState<Theme>(currentTheme)
@@ -86,7 +89,23 @@ function Workspace({
 }) {
   const runtime = useAssistantRuntime()
   const [addingOpen, setAddingOpen] = useState(false)
+  const [collapsed, setCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem(COLLAPSE_KEY) === '1'
+    } catch {
+      return false
+    }
+  })
   const list = connections ?? []
+
+  function setCollapsedPersisted(next: boolean) {
+    setCollapsed(next)
+    try {
+      localStorage.setItem(COLLAPSE_KEY, next ? '1' : '0')
+    } catch {
+      // storage unavailable — collapse just won't persist across reloads
+    }
+  }
 
   function switchTo(id: string | null) {
     if (id === activeId) return
@@ -115,22 +134,28 @@ function Workspace({
 
   return (
     <div className="flex h-full">
-      <Sidebar
-        connections={list}
-        activeId={activeId}
-        activeTables={meta?.tables ?? null}
-        addingOpen={addingOpen}
-        setAddingOpen={setAddingOpen}
-        onSwitch={switchTo}
-        onAdded={handleAdded}
-        onRenamed={handleRenamed}
-        onDeleted={handleDeleted}
-        theme={theme}
-        onToggleTheme={onToggleTheme}
-      />
+      {!collapsed && (
+        <Sidebar
+          connections={list}
+          activeId={activeId}
+          activeTables={meta?.tables ?? null}
+          onOpenAdd={() => setAddingOpen(true)}
+          onCollapse={() => setCollapsedPersisted(true)}
+          onSwitch={switchTo}
+          onRenamed={handleRenamed}
+          onDeleted={handleDeleted}
+          theme={theme}
+          onToggleTheme={onToggleTheme}
+        />
+      )}
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <MainBar activeConn={activeConn} meta={meta} />
+        <MainBar
+          activeConn={activeConn}
+          meta={meta}
+          collapsed={collapsed}
+          onExpand={() => setCollapsedPersisted(false)}
+        />
         <FaultBanner />
         <div className="min-h-0 flex-1">
           {connections === null ? null : activeId ? (
@@ -140,19 +165,47 @@ function Workspace({
           )}
         </div>
       </div>
+
+      {addingOpen && (
+        <AddConnectionModal onClose={() => setAddingOpen(false)} onAdded={handleAdded} />
+      )}
     </div>
   )
 }
 
-function MainBar({ activeConn, meta }: { activeConn: ConnectionView | null; meta: Meta | null }) {
+function MainBar({
+  activeConn,
+  meta,
+  collapsed,
+  onExpand,
+}: {
+  activeConn: ConnectionView | null
+  meta: Meta | null
+  collapsed: boolean
+  onExpand: () => void
+}) {
   const runtime = useAssistantRuntime()
   const label = meta?.database || activeConn?.label
+  const dotColor = activeConn?.color
   return (
     <header className="flex items-center justify-between gap-3 border-b border-border px-4 py-2.5">
       <div className="flex min-w-0 items-center gap-2">
+        {collapsed && (
+          <button
+            onClick={onExpand}
+            aria-label="Show sidebar"
+            title="Show sidebar"
+            className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          >
+            <SidebarIcon className="text-[15px]" />
+          </button>
+        )}
         {activeConn && (
           <>
-            <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${meta ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+            <span
+              className={`h-1.5 w-1.5 shrink-0 rounded-full ${!dotColor && (meta ? 'bg-emerald-500' : 'bg-amber-500')}`}
+              {...(dotColor ? { style: { backgroundColor: dotColor } } : {})}
+            />
             <span className="truncate text-sm font-medium">{activeConn.name}</span>
             {label && label !== activeConn.name && (
               <span className="hidden truncate text-xs text-muted-foreground sm:inline">{label}</span>

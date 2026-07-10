@@ -30,16 +30,18 @@ export type Meta = { tables: number; model: string; database: string }
 
 // A saved connection as the client sees it — never the raw URL (server: the
 // connection registry). `label` is the password-free user@host/db.
-export type ConnectionView = { id: string; name: string; label: string }
+export type ConnectionView = { id: string; name: string; label: string; color?: string }
 
 // Full schema + per-table row counts (server: GET /api/schema).
 export type SchemaTable = { table: string; rows: string }
 export type SchemaInfo = { ddl: string; tables: SchemaTable[] }
 
 // Result of a slash command — rendered as an assistant message, but produced
-// client-side / from /api/schema, not by the NL→SQL engine (so it never enters the
-// model-context history buffer). '/new' is a UI action and has no result.
+// client-side / from /api/schema (or /api/sql), not by the NL→SQL engine (so it
+// never enters the model-context history buffer). '/new' is a UI action, no result.
 export type CommandResult =
   | { kind: 'help' }
   | { kind: 'schema'; ddl: string; tables: SchemaTable[] }
   | { kind: 'tables'; tables: SchemaTable[] }
+  | { kind: 'sql'; sql: string; columns: string[]; rows: Record<string, unknown>[] }
+  | { kind: 'sql-error'; message: string }

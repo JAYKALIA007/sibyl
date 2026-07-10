@@ -34,6 +34,21 @@ test('toView keeps an explicit name', () => {
   assert.equal(v.label, 'u@h/wc')
 })
 
+test('color round-trips through toView and parseConnections, absent when unset', () => {
+  const withColor = toView({ id: '1', name: 'A', url: 'postgresql://u@h/a', color: '#f59e0b' })
+  assert.equal(withColor.color, '#f59e0b')
+  assert.equal('color' in toView({ id: '2', name: 'B', url: 'postgresql://u@h/b' }), false)
+
+  const parsed = parseConnections(
+    JSON.stringify([
+      { id: 'a', name: 'A', url: 'postgresql://u@h/a', color: '#10b981' },
+      { id: 'b', name: 'B', url: 'postgresql://u@h/b' },
+    ]),
+  )
+  assert.equal(parsed[0].color, '#10b981')
+  assert.equal('color' in parsed[1], false)
+})
+
 test('parseConnections keeps valid records and drops malformed ones', () => {
   const raw = JSON.stringify([
     { id: 'a', name: 'A', url: 'postgresql://x@h/a' },

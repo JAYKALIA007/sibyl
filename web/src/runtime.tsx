@@ -4,10 +4,10 @@ import {
   useLocalRuntime,
   type ChatModelAdapter,
 } from '@assistant-ui/react'
-import { ask, getSchema, SibylFault } from './api'
+import { ask, getSchema, runSql, SibylFault } from './api'
 import { faultBus } from './faults'
 import { deriveHistory, type HistoryMessage } from './history'
-import { parseCommand } from './commands'
+import { parseCommand, parseSqlCommand } from './commands'
 import type { AskResult, CommandResult } from './types'
 
 type RunMessage = { role: string; content: readonly unknown[]; metadata?: { custom?: unknown } }
@@ -62,6 +62,20 @@ async function runCommand(
   return kind === 'schema' ? { kind: 'schema', ddl, tables } : { kind: 'tables', tables }
 }
 
+// `/sql <query>` → a command result. The guard runs server-side; a rejection or DB
+// error renders inline (sql-error) rather than throwing a connection fault.
+async function runSqlCommand(query: string, connectionId: string): Promise<CommandResult> {
+  const outcome = await runSql(query, connectionId)
+  switch (outcome.kind) {
+    case 'sql':
+      return { kind: 'sql', sql: outcome.sql, columns: outcome.columns, rows: outcome.rows }
+    case 'rejected':
+      return { kind: 'sql-error', message: outcome.reason }
+    case 'error':
+      return { kind: 'sql-error', message: outcome.error }
+  }
+}
+
 function commandFallbackText(result: CommandResult): string {
   switch (result.kind) {
     case 'help':
@@ -70,6 +84,10 @@ function commandFallbackText(result: CommandResult): string {
       return `Schema — ${result.tables.length} table${result.tables.length === 1 ? '' : 's'}`
     case 'tables':
       return `${result.tables.length} table${result.tables.length === 1 ? '' : 's'}`
+    case 'sql':
+      return `${result.rows.length} row${result.rows.length === 1 ? '' : 's'}`
+    case 'sql-error':
+      return result.message
   }
 }
 
@@ -87,8 +105,18 @@ function makeAdapter(connRef: { current: string | null }): ChatModelAdapter {
       // separate from the visual thread (ADR 0001). The trailing (current) question
       // is naturally excluded (no answer follows it yet).
       const history = deriveHistory(toHistoryMessages(messages))
+      const sqlQuery = parseSqlCommand(question)
       const command = parseCommand(question)
       try {
+        // `/sql <query>` — run raw SQL through the guard, render as a command.
+        if (sqlQuery) {
+          const result = await runSqlCommand(sqlQuery, connectionId)
+          faultBus.emit(null)
+          return {
+            content: [{ type: 'text', text: commandFallbackText(result) }],
+            metadata: { custom: { command: result } },
+          }
+        }
         // Content commands short-circuit the engine and render their own message.
         // They carry `command` (not `result`) in metadata, so deriveHistory — which
         // only reads `result` — never folds them into the model-context buffer.

@@ -64,6 +64,33 @@ export async function getSchema(connectionId: string): Promise<SchemaInfo> {
   return body
 }
 
+// Raw user SQL via the /sql command — run through the server's read-only guard.
+// Outcomes (rows / rejected / db-error) all come back 200; only a genuine fault throws.
+export type SqlOutcome =
+  | { kind: 'sql'; sql: string; columns: string[]; rows: Record<string, unknown>[] }
+  | { kind: 'rejected'; reason: string }
+  | { kind: 'error'; error: string }
+
+export async function runSql(sql: string, connectionId: string): Promise<SqlOutcome> {
+  let res: Response
+  try {
+    res = await fetch(`${API}/sql`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sql, connectionId }),
+    })
+  } catch (e) {
+    throw new SibylFault(`network error: ${String(e)}`)
+  }
+  const body = (await res.json().catch(() => null)) as SqlOutcome | Fault | null
+  if (!res.ok || !body || (body as Fault).kind === 'fault') {
+    throw new SibylFault(
+      body && 'error' in body ? (body as Fault).error : `server error ${res.status}`,
+    )
+  }
+  return body as SqlOutcome
+}
+
 // Schema-aware starter questions for the empty state; [] on failure.
 export async function getSuggestions(connectionId: string): Promise<string[]> {
   try {
@@ -91,7 +118,7 @@ export async function listConnections(): Promise<ConnectionView[]> {
 // Add a connection. The server probes it first; a failure comes back as a
 // classified message (host/auth/SSL/…) which the add-form shows inline.
 export async function addConnection(
-  input: { name?: string; url: string },
+  input: { name?: string; url: string; color?: string },
 ): Promise<{ ok: true; connection: ConnectionView; tables: number } | { ok: false; error: string }> {
   let res: Response
   try {
