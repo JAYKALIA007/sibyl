@@ -6,6 +6,7 @@
 // unit-tested in isolation. getSchema is the impure half that hits the live DB.
 
 import { runQuery, close, type Conn } from './db.ts'
+import { isMain } from './isMain.ts'
 
 export type Column = { name: string; type: string; notNull: boolean }
 export type ForeignKey = { column: string; refTable: string; refColumn: string }
@@ -83,7 +84,7 @@ export async function getSchema(conn?: Conn): Promise<Schema> {
 }
 
 // `npm run schema:ddl` — print the live DB's schema as DDL.
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (isMain(import.meta.url)) {
   console.log(toDDL(await getSchema()))
   await close()
 }

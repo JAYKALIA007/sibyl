@@ -10,6 +10,7 @@ import { toSql, NO_ANSWER, type Turn } from './nl2sql.ts'
 import { guard } from './guard.ts'
 import { runQuery, type Conn } from './db.ts'
 import { generate, NUM_CTX, type Usage } from './ollama.ts'
+import { isMain } from './isMain.ts'
 
 export type { Conn }
 
@@ -120,7 +121,7 @@ export async function ask(question: string, history: Turn[] = [], conn?: Conn): 
 }
 
 // `npm run core:check` — run a few questions end-to-end through the engine.
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (isMain(import.meta.url)) {
   const { close } = await import('./db.ts')
   const questions = [
     'How many users are there?',

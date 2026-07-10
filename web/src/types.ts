@@ -28,6 +28,13 @@ export type Fault = { kind: 'fault'; error: string }
 // Status-bar metadata (server: GET /api/meta).
 export type Meta = { tables: number; model: string; database: string }
 
+// First-run readiness of the local LLM (server: GET /api/setup). Backs the
+// onboarding flow — 'unreachable' = Ollama not installed/running, 'model-missing'
+// = installed but the chat model isn't pulled yet.
+export type Setup =
+  | { ready: true; model: string }
+  | { ready: false; reason: 'unreachable' | 'model-missing'; model: string; pullCommand: string }
+
 // A saved connection as the client sees it — never the raw URL (server: the
 // connection registry). `label` is the password-free user@host/db.
 export type ConnectionView = { id: string; name: string; label: string; color?: string }

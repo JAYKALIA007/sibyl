@@ -38,8 +38,40 @@ const WEB_DIST = join(dirname(fileURLToPath(import.meta.url)), 'web', 'dist')
 const app = express()
 app.use(express.json())
 
+// The desktop shell serves the UI from a different origin (tauri://localhost) than
+// this sidecar (127.0.0.1:<port>), so the API needs permissive CORS. Safe here: the
+// server binds loopback only (unreachable off-box) and uses no cookies/credentials.
+// The browser app is same-origin (Vite proxy / static serve) and unaffected.
+app.use((req, res, next) => {
+  res.setHeader('Access-Control-Allow-Origin', '*')
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PATCH,DELETE,OPTIONS')
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+  if (req.method === 'OPTIONS') {
+    res.sendStatus(204)
+    return
+  }
+  next()
+})
+
 app.get('/api/health', (_req, res) => {
   res.json({ ok: true })
+})
+
+// First-run onboarding backing: is the local LLM installed and pulled? The desktop
+// shell boots the UI before Ollama is necessarily ready, so the onboarding flow polls
+// this and auto-advances. Never faults — a not-ready state IS the answer.
+app.get('/api/setup', async (_req, res) => {
+  const status = await checkOllama()
+  if (status.ok) {
+    res.json({ ready: true, model: CHAT_MODEL })
+    return
+  }
+  res.json({
+    ready: false,
+    reason: status.reason, // 'unreachable' | 'model-missing'
+    model: CHAT_MODEL,
+    pullCommand: `ollama pull ${CHAT_MODEL}`,
+  })
 })
 
 // ── connection registry ──────────────────────────────────────────────────────
@@ -211,43 +243,51 @@ app.use('/api', (_req, res) => {
   res.status(404).json({ kind: 'fault', error: 'not found' })
 })
 
-// Preflight the local LLM (non-interactive here): refuse to start with a clear
-// message rather than 500-ing on the first question.
-const ollama = await checkOllama()
-if (!ollama.ok) {
-  if (ollama.reason === 'unreachable') {
-    console.error(`Can't reach Ollama at ${OLLAMA} — install from https://ollama.com and start it.`)
-  } else {
-    console.error(`Ollama model "${ollama.model}" isn't pulled — run: ollama pull ${ollama.model}`)
-  }
-  process.exit(1)
-}
-
-// No hard DB requirement at boot anymore: connections are added/switched from the
-// UI, so the server can start with an empty registry (the app shows an
-// add-your-first-connection state). We only warm a schema if one already exists.
-const server = app.listen(PORT, HOST, () => {
-  console.log(`Sibyl API → http://${HOST}:${PORT}`)
-  // Best-effort warm of the first saved connection's schema + starter questions off
-  // the request path, so the common single-DB case isn't cold on first ask. The
-  // client picks the actual active connection; the endpoints regenerate on demand.
-  const [first] = listConnections()
-  if (first) {
-    const c = findConnection(first.id)
-    if (c) {
-      const conn: Conn = { id: c.id, url: c.url }
-      loadSchema(conn)
-        .then((ddl) => getSuggestions(ddl, conn.id))
-        .catch(() => {})
+// Boot wrapped in a function (no top-level await) so the server bundles cleanly to
+// CJS for the desktop sidecar — the ONE self-contained file the Tauri shell spawns,
+// and what Node SEA later wraps into a standalone binary.
+async function start() {
+  // Preflight the local LLM. The desktop shell (and the browser app) boot the UI
+  // before Ollama is necessarily ready and let the onboarding flow guide the install
+  // via GET /api/setup — so a not-ready LLM is a WARNING, not a fatal boot error.
+  // The /api/ask path still faults cleanly (5xx) until the model is pulled.
+  const ollama = await checkOllama()
+  if (!ollama.ok) {
+    if (ollama.reason === 'unreachable') {
+      console.warn(`⚠ Can't reach Ollama at ${OLLAMA} — install from https://ollama.com and start it. The app will guide you through setup.`)
+    } else {
+      console.warn(`⚠ Ollama model "${ollama.model}" isn't pulled — run: ollama pull ${ollama.model}. The app will guide you through setup.`)
     }
   }
-})
 
-for (const sig of ['SIGINT', 'SIGTERM'] as const) {
-  process.on(sig, () => {
-    server.close(async () => {
-      await close()
-      process.exit(0)
-    })
+  // No hard DB requirement at boot anymore: connections are added/switched from the
+  // UI, so the server can start with an empty registry (the app shows an
+  // add-your-first-connection state). We only warm a schema if one already exists.
+  const server = app.listen(PORT, HOST, () => {
+    console.log(`Sibyl API → http://${HOST}:${PORT}`)
+    // Best-effort warm of the first saved connection's schema + starter questions off
+    // the request path, so the common single-DB case isn't cold on first ask. The
+    // client picks the actual active connection; the endpoints regenerate on demand.
+    const [first] = listConnections()
+    if (first) {
+      const c = findConnection(first.id)
+      if (c) {
+        const conn: Conn = { id: c.id, url: c.url }
+        loadSchema(conn)
+          .then((ddl) => getSuggestions(ddl, conn.id))
+          .catch(() => {})
+      }
+    }
   })
+
+  for (const sig of ['SIGINT', 'SIGTERM'] as const) {
+    process.on(sig, () => {
+      server.close(async () => {
+        await close()
+        process.exit(0)
+      })
+    })
+  }
 }
+
+start()

@@ -4,6 +4,8 @@
 // swapping the "brain" — e.g. to compare qwen2.5-coder vs llama3.2 vs an API model
 // — is a one-line change, and the eval can drive it with SIBYL_CHAT_MODEL.
 
+import { isMain } from './isMain.ts'
+
 const OLLAMA = process.env.OLLAMA_HOST || 'http://localhost:11434'
 
 // SQL is a code task → default to a local coder model, not a general one.
@@ -112,7 +114,7 @@ export async function embed(text: string): Promise<number[]> {
 }
 
 // Self-test: `npm run ollama:check` — proves both endpoints work before anything else.
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (isMain(import.meta.url)) {
   console.log(`chat model:  ${CHAT_MODEL}`)
   console.log(`embed model: ${EMBED_MODEL}\n`)
 

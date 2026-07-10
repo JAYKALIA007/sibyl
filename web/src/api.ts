@@ -1,4 +1,4 @@
-import type { AskResult, ConnectionView, Fault, Meta, SchemaInfo, Turn } from './types'
+import type { AskResult, ConnectionView, Fault, Meta, SchemaInfo, Setup, Turn } from './types'
 
 // Runtime-configurable so a future desktop shell (Tauri sidecar) can point the same
 // build at a dynamic port. Default '/api' is proxied to Express by Vite in dev.
@@ -33,6 +33,18 @@ export async function ask(
   }
   if (!body) throw new SibylFault('empty response from server')
   return body as AskResult
+}
+
+// Local-LLM readiness for the onboarding gate. Treats a network failure as
+// 'unreachable' (same as the server would) so first-run always has something to show.
+export async function getSetup(): Promise<Setup> {
+  try {
+    const res = await fetch(`${API}/setup`)
+    if (!res.ok) throw new Error(`status ${res.status}`)
+    return (await res.json()) as Setup
+  } catch {
+    return { ready: false, reason: 'unreachable', model: 'qwen2.5-coder', pullCommand: 'ollama pull qwen2.5-coder' }
+  }
 }
 
 // Best-effort status-bar metadata for the active connection; null on any failure
