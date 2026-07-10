@@ -13,10 +13,11 @@ import { cn } from './lib/utils'
 import { AssistantAnswer } from './AssistantAnswer'
 import { CommandAnswer } from './CommandAnswer'
 import { matchCommands, type Command } from './commands'
+import { readCommand, readResult } from './messageContract'
 import { SparkleIcon, SendIcon } from './components/icons'
 import { SibylMark } from './SibylMark'
 import { PHASE_COPY, TIMING, resolveTarget, type Stage } from './suggestionStage'
-import type { AskResult, CommandResult, Meta } from './types'
+import type { Meta } from './types'
 
 export function Thread({ meta, suggestions }: { meta: Meta | null; suggestions: string[] | null }) {
   return (
@@ -175,12 +176,8 @@ function UserMessage() {
 }
 
 function AssistantMessage() {
-  const result = useMessage(
-    (m) => (m.metadata.custom as { result?: AskResult } | undefined)?.result,
-  )
-  const command = useMessage(
-    (m) => (m.metadata.custom as { command?: CommandResult } | undefined)?.command,
-  )
+  const result = useMessage((m) => readResult(m.metadata.custom))
+  const command = useMessage((m) => readCommand(m.metadata.custom))
   const isRunning = useMessage((m) => m.status?.type === 'running')
 
   // A finished assistant turn with no result and no command means the run threw a
