@@ -11,6 +11,7 @@ Releases are automated by [`.github/workflows/release.yml`](.github/workflows/re
    - `src-tauri/tauri.conf.json`
    - `src-tauri/Cargo.toml`
    - `src-tauri/Cargo.lock` (the `sibyl-desktop` entry)
+   - `CHANGELOG.md` (move release notes from `Unreleased` into the new version)
 
 2. **Tag and push:**
    ```bash
