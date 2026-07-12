@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useAssistantRuntime } from '@assistant-ui/react'
 import { SibylRuntimeProvider } from './runtime'
 import { Thread } from './thread'
@@ -6,12 +6,8 @@ import { Sidebar } from './Sidebar'
 import { AddConnectionModal } from './AddConnectionModal'
 import { Onboarding } from './Onboarding'
 import { faultBus } from './faults'
-import { getMeta, getSetup, getSuggestions, listConnections } from './api'
-import {
-  resolveActiveConnection,
-  getStoredActiveId,
-  setStoredActiveId,
-} from './connections'
+import { getSetup } from './api'
+import { useActiveConnection, type ActiveConnection } from './useActiveConnection'
 import { currentTheme, setTheme, type Theme } from './theme'
 import { PlusIcon, DatabaseIcon, SidebarIcon } from './components/icons'
 import type { ConnectionView, Meta, Setup } from './types'
@@ -22,34 +18,17 @@ export function App() {
   const [theme, setThemeState] = useState<Theme>(currentTheme)
   // null = still probing the local LLM; gates the app behind onboarding until ready.
   const [setup, setSetup] = useState<Setup | null>(null)
-  // null = still loading the registry; [] = loaded, none saved.
-  const [connections, setConnections] = useState<ConnectionView[] | null>(null)
-  const [activeId, setActiveId] = useState<string | null>(null)
-  const [meta, setMeta] = useState<Meta | null>(null)
-  const [suggestions, setSuggestions] = useState<string[] | null>(null)
+
+  // Resetting the thread on a connection switch needs the assistant-ui runtime, which
+  // only exists inside the provider below — but activeId (read to build the provider)
+  // is owned by the hook up here. This ref bridges that: Workspace fills it with the
+  // real reset, the hook calls it on every switch.
+  const resetThreadRef = useRef<() => void>(() => {})
+  const conn = useActiveConnection(() => resetThreadRef.current())
 
   useEffect(() => {
     getSetup().then(setSetup)
   }, [])
-
-  useEffect(() => {
-    listConnections().then((list) => {
-      setConnections(list)
-      const id = resolveActiveConnection(getStoredActiveId(), list)
-      setActiveId(id)
-      setStoredActiveId(id)
-    })
-  }, [])
-
-  // Active connection changed → refetch its metadata + starter questions (a switch
-  // also resets the thread, in Workspace).
-  useEffect(() => {
-    setMeta(null)
-    setSuggestions(null)
-    if (!activeId) return
-    getMeta(activeId).then(setMeta)
-    getSuggestions(activeId).then(setSuggestions)
-  }, [activeId])
 
   function toggleTheme() {
     const next: Theme = theme === 'dark' ? 'light' : 'dark'
@@ -63,16 +42,12 @@ export function App() {
   }
 
   return (
-    <SibylRuntimeProvider activeConnectionId={activeId}>
+    <SibylRuntimeProvider activeConnectionId={conn.activeId}>
       <Workspace
         theme={theme}
         onToggleTheme={toggleTheme}
-        connections={connections}
-        setConnections={setConnections}
-        activeId={activeId}
-        setActiveId={setActiveId}
-        meta={meta}
-        suggestions={suggestions}
+        conn={conn}
+        resetThreadRef={resetThreadRef}
       />
     </SibylRuntimeProvider>
   )
@@ -83,21 +58,13 @@ export function App() {
 function Workspace({
   theme,
   onToggleTheme,
-  connections,
-  setConnections,
-  activeId,
-  setActiveId,
-  meta,
-  suggestions,
+  conn,
+  resetThreadRef,
 }: {
   theme: Theme
   onToggleTheme: () => void
-  connections: ConnectionView[] | null
-  setConnections: (list: ConnectionView[]) => void
-  activeId: string | null
-  setActiveId: (id: string | null) => void
-  meta: Meta | null
-  suggestions: string[] | null
+  conn: ActiveConnection
+  resetThreadRef: React.MutableRefObject<() => void>
 }) {
   const runtime = useAssistantRuntime()
   const [addingOpen, setAddingOpen] = useState(false)
@@ -108,7 +75,13 @@ function Workspace({
       return false
     }
   })
+  const { connections, activeId, meta, suggestions } = conn
   const list = connections ?? []
+
+  // Give the hook the runtime-backed thread reset it can't reach on its own.
+  useEffect(() => {
+    resetThreadRef.current = () => runtime.threads.switchToNewThread()
+  }, [runtime, resetThreadRef])
 
   function setCollapsedPersisted(next: boolean) {
     setCollapsed(next)
@@ -119,27 +92,9 @@ function Workspace({
     }
   }
 
-  function switchTo(id: string | null) {
-    if (id === activeId) return
-    runtime.threads.switchToNewThread() // switch = fresh thread
-    setActiveId(id)
-    setStoredActiveId(id)
-  }
-
-  function handleAdded(conn: ConnectionView) {
-    setConnections([...list, conn])
+  function handleAdded(newConn: ConnectionView) {
     setAddingOpen(false)
-    switchTo(conn.id)
-  }
-
-  function handleRenamed(view: ConnectionView) {
-    setConnections(list.map((c) => (c.id === view.id ? view : c)))
-  }
-
-  function handleDeleted(id: string) {
-    const next = list.filter((c) => c.id !== id)
-    setConnections(next)
-    if (id === activeId) switchTo(next[0]?.id ?? null)
+    conn.add(newConn)
   }
 
   const activeConn = list.find((c) => c.id === activeId) ?? null
@@ -153,9 +108,9 @@ function Workspace({
           activeTables={meta?.tables ?? null}
           onOpenAdd={() => setAddingOpen(true)}
           onCollapse={() => setCollapsedPersisted(true)}
-          onSwitch={switchTo}
-          onRenamed={handleRenamed}
-          onDeleted={handleDeleted}
+          onSwitch={conn.switchTo}
+          onRenamed={conn.rename}
+          onDeleted={conn.remove}
           theme={theme}
           onToggleTheme={onToggleTheme}
         />

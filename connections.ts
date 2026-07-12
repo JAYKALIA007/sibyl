@@ -86,62 +86,126 @@ export function renameConnection(list: Connection[], id: string, name: string): 
   return list.map((c) => (c.id === id ? { ...c, name } : c))
 }
 
-// ── impure shell ─────────────────────────────────────────────────────────────────
+// ── impure shell (dependency-injected) ────────────────────────────────────────────
+// The registry logic is the same whether it's backed by a real file or an in-memory
+// store, so the storage, the probe, and id generation are injected ports. Production
+// wires the ~/.sibyl file + a live probe (below); tests wire an in-memory store + a
+// fake probe, so the previously-untested paths — seeding, corruption tolerance,
+// probe-then-save — are covered without touching the real filesystem or a database.
 
-function writeConnections(list: Connection[]): void {
-  mkdirSync(DIR, { recursive: true })
-  writeFileSync(FILE, JSON.stringify(list, null, 2))
-  try {
-    chmodSync(FILE, 0o600) // credentials live here — owner read/write only
-  } catch {
-    // best-effort (e.g. a filesystem without POSIX perms); the file is still local-only
+// Just enough storage for the registry's JSON blob. `read` returns null when absent.
+// The production adapter owns the FS specifics (mkdir, 0600 chmod, path).
+export type RegistryStore = {
+  read: () => string | null
+  write: (text: string) => void
+}
+
+export type ProbeFn = (
+  url: string,
+) => Promise<{ ok: true; tableCount: number } | { ok: false; error: string }>
+
+export type RegistryDeps = {
+  store: RegistryStore
+  probe: ProbeFn
+  databaseUrl?: string
+  uuid: () => string
+}
+
+export type Registry = {
+  listConnections: () => ConnectionView[]
+  findConnection: (id: string) => Connection | undefined
+  addConnection: (input: {
+    name?: string
+    url: string
+    color?: string
+  }) => Promise<{ ok: true; view: ConnectionView; tables: number } | { ok: false; error: string; hint: string }>
+  deleteConnectionById: (id: string) => void
+  renameConnectionById: (id: string, name: string) => ConnectionView | undefined
+}
+
+export function createRegistry(deps: RegistryDeps): Registry {
+  // The registry as stored. On first ever read (no file), seed `default` from
+  // DATABASE_URL and persist it, so existing users boot straight onto their DB.
+  // A corrupt store is tolerated as an empty registry (parseConnections), never a throw.
+  function read(): Connection[] {
+    const raw = deps.store.read()
+    if (raw === null) {
+      const seeded = seedDefault([], deps.databaseUrl)
+      if (seeded.length) write(seeded)
+      return seeded
+    }
+    return parseConnections(raw)
+  }
+
+  function write(list: Connection[]): void {
+    deps.store.write(JSON.stringify(list, null, 2))
+  }
+
+  function listConnections(): ConnectionView[] {
+    return read().map(toView)
+  }
+
+  function findConnection(id: string): Connection | undefined {
+    return read().find((c) => c.id === id)
+  }
+
+  // Validate (probe) before persisting — never save a connection we can't reach.
+  async function addConnection(input: { name?: string; url: string; color?: string }) {
+    const probe = await deps.probe(input.url)
+    if (!probe.ok) return { ok: false as const, error: probe.error, hint: classifyConnError(probe.error) }
+
+    const conn: Connection = {
+      id: deps.uuid(),
+      name: input.name?.trim() || connectionLabel(input.url),
+      url: input.url,
+      ...(input.color ? { color: input.color } : {}),
+    }
+    write(upsertConnection(read(), conn))
+    return { ok: true as const, view: toView(conn), tables: probe.tableCount }
+  }
+
+  function deleteConnectionById(id: string): void {
+    write(removeConnection(read(), id))
+  }
+
+  function renameConnectionById(id: string, name: string): ConnectionView | undefined {
+    const list = renameConnection(read(), id, name)
+    const found = list.find((c) => c.id === id)
+    if (!found) return undefined
+    write(list)
+    return toView(found)
+  }
+
+  return { listConnections, findConnection, addConnection, deleteConnectionById, renameConnectionById }
+}
+
+// ── production wiring ──────────────────────────────────────────────────────────────
+// The ~/.sibyl/connections.json store: owner-only (0600) since the raw URLs carry
+// passwords. mkdir/chmod live here, out of the registry logic.
+function fileStore(): RegistryStore {
+  return {
+    read: () => (existsSync(FILE) ? readFileSync(FILE, 'utf8') : null),
+    write: (text) => {
+      mkdirSync(DIR, { recursive: true })
+      writeFileSync(FILE, text)
+      try {
+        chmodSync(FILE, 0o600) // credentials live here — owner read/write only
+      } catch {
+        // best-effort (e.g. a filesystem without POSIX perms); the file is still local-only
+      }
+    },
   }
 }
 
-// The registry as stored. On first ever read (no file), seed `default` from
-// DATABASE_URL and persist it, so existing users boot straight onto their DB.
-function readConnections(): Connection[] {
-  if (!existsSync(FILE)) {
-    const seeded = seedDefault([], process.env.DATABASE_URL)
-    if (seeded.length) writeConnections(seeded)
-    return seeded
-  }
-  return parseConnections(readFileSync(FILE, 'utf8'))
-}
+const registry = createRegistry({
+  store: fileStore(),
+  probe: probeConnection,
+  databaseUrl: process.env.DATABASE_URL,
+  uuid: randomUUID,
+})
 
-export function listConnections(): ConnectionView[] {
-  return readConnections().map(toView)
-}
-
-export function findConnection(id: string): Connection | undefined {
-  return readConnections().find((c) => c.id === id)
-}
-
-// Validate (probe) before persisting — never save a connection we can't reach.
-export async function addConnection(
-  input: { name?: string; url: string; color?: string },
-): Promise<{ ok: true; view: ConnectionView; tables: number } | { ok: false; error: string; hint: string }> {
-  const probe = await probeConnection(input.url)
-  if (!probe.ok) return { ok: false, error: probe.error, hint: classifyConnError(probe.error) }
-
-  const conn: Connection = {
-    id: randomUUID(),
-    name: input.name?.trim() || connectionLabel(input.url),
-    url: input.url,
-    ...(input.color ? { color: input.color } : {}),
-  }
-  writeConnections(upsertConnection(readConnections(), conn))
-  return { ok: true, view: toView(conn), tables: probe.tableCount }
-}
-
-export function deleteConnectionById(id: string): void {
-  writeConnections(removeConnection(readConnections(), id))
-}
-
-export function renameConnectionById(id: string, name: string): ConnectionView | undefined {
-  const list = renameConnection(readConnections(), id, name)
-  const found = list.find((c) => c.id === id)
-  if (!found) return undefined
-  writeConnections(list)
-  return toView(found)
-}
+export const listConnections = registry.listConnections
+export const findConnection = registry.findConnection
+export const addConnection = registry.addConnection
+export const deleteConnectionById = registry.deleteConnectionById
+export const renameConnectionById = registry.renameConnectionById

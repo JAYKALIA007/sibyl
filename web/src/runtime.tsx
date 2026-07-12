@@ -7,7 +7,8 @@ import {
 import { ask, getSchema, runSql, SibylFault } from './api'
 import { faultBus } from './faults'
 import { deriveHistory, type HistoryMessage } from './history'
-import { parseCommand, parseSqlCommand } from './commands'
+import { routeMessage } from './messageRouting'
+import { askMeta, commandMeta, readResult } from './messageContract'
 import type { AskResult, CommandResult } from './types'
 
 type RunMessage = { role: string; content: readonly unknown[]; metadata?: { custom?: unknown } }
@@ -32,7 +33,7 @@ function lastUserText(messages: readonly RunMessage[]): string {
 function toHistoryMessages(messages: readonly RunMessage[]): HistoryMessage[] {
   return messages.map((m) =>
     m.role === 'assistant'
-      ? { role: 'assistant', result: (m.metadata?.custom as { result?: AskResult })?.result ?? null }
+      ? { role: 'assistant', result: readResult(m.metadata?.custom) }
       : { role: 'user', text: partsText(m.content) },
   )
 }
@@ -105,30 +106,21 @@ function makeAdapter(connRef: { current: string | null }): ChatModelAdapter {
       // separate from the visual thread (ADR 0001). The trailing (current) question
       // is naturally excluded (no answer follows it yet).
       const history = deriveHistory(toHistoryMessages(messages))
-      const sqlQuery = parseSqlCommand(question)
-      const command = parseCommand(question)
+      const route = routeMessage(question)
       try {
-        // `/sql <query>` — run raw SQL through the guard, render as a command.
-        if (sqlQuery) {
-          const result = await runSqlCommand(sqlQuery, connectionId)
+        // Commands (/sql, /schema, /tables, /help) short-circuit the engine and
+        // render their own message. They carry `command` (not `result`) in metadata,
+        // so deriveHistory — which only reads `result` — never folds them into the
+        // model-context buffer.
+        if (route.kind === 'sql' || route.kind === 'command') {
+          const result =
+            route.kind === 'sql'
+              ? await runSqlCommand(route.query, connectionId)
+              : await runCommand(route.name as 'schema' | 'tables' | 'help', connectionId)
           faultBus.emit(null)
           return {
             content: [{ type: 'text', text: commandFallbackText(result) }],
-            metadata: { custom: { command: result } },
-          }
-        }
-        // Content commands short-circuit the engine and render their own message.
-        // They carry `command` (not `result`) in metadata, so deriveHistory — which
-        // only reads `result` — never folds them into the model-context buffer.
-        if (command && command.kind === 'content') {
-          const result = await runCommand(
-            command.name.slice(1) as 'schema' | 'tables' | 'help',
-            connectionId,
-          )
-          faultBus.emit(null)
-          return {
-            content: [{ type: 'text', text: commandFallbackText(result) }],
-            metadata: { custom: { command: result } },
+            metadata: { custom: commandMeta(result) },
           }
         }
         const result = await ask(question, history, connectionId)
@@ -137,7 +129,7 @@ function makeAdapter(connRef: { current: string | null }): ChatModelAdapter {
         // it to render SQL + table + summary + meter.
         return {
           content: [{ type: 'text', text: fallbackText(result) }],
-          metadata: { custom: { result } },
+          metadata: { custom: askMeta(result) },
         }
       } catch (e) {
         // A genuine fault (5xx / network) is a connection problem, not a chat message.
