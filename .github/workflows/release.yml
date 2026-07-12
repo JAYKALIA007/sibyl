@@ -1,0 +1,93 @@
+name: Release
+
+# Push a version tag → ship both channels automatically:
+#   - build the self-contained macOS DMG and attach it to a GitHub Release
+#   - publish sibyl-cli to npm
+# No manual `gh release create` or `npm publish`. See RELEASING.md.
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write # create releases + upload the DMG
+
+jobs:
+  desktop:
+    name: Build DMG + GitHub Release
+    runs-on: macos-14 # Apple Silicon (arm64) — matches the DMG we ship
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Verify version matches tag
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          PKG=$(node -p "require('./package.json').version")
+          TAURI=$(node -p "require('./src-tauri/tauri.conf.json').version")
+          if [ "$TAG" != "$PKG" ] || [ "$TAG" != "$TAURI" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match package.json ($PKG) / tauri.conf.json ($TAURI). Bump the versions first."
+            exit 1
+          fi
+
+      - run: pnpm install --frozen-lockfile
+
+      # Runs desktop:prep (bundle sidecar + copy Node runtime + build web), compiles
+      # the release binary, ad-hoc signs, and produces the .dmg.
+      - name: Build app + DMG
+        run: pnpm tauri build
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: src-tauri/target/release/bundle/dmg/*.dmg
+          generate_release_notes: true
+          body: |
+            ## Download
+
+            **Sibyl — macOS, Apple Silicon (arm64).** Open the DMG → drag **Sibyl** to Applications → **right-click → Open** the first time (the app is ad-hoc signed / not notarized, so macOS shows an "unidentified developer" prompt once).
+
+            Requires [Ollama](https://ollama.com) — the app's onboarding walks you through installing it.
+
+            Prefer the terminal? `npx sibyl-cli` (CLI) · `npx sibyl-cli serve` (web GUI).
+
+  npm:
+    name: Publish to npm
+    needs: desktop # only publish npm if the DMG + release succeeded (keeps channels in sync)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          registry-url: 'https://registry.npmjs.org'
+
+      - run: pnpm install --frozen-lockfile
+
+      # `prepublishOnly` builds the web bundle + CLI. Publishes the version already in
+      # package.json (bumped in the release PR before tagging).
+      - name: Publish
+        run: npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
