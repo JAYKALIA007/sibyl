@@ -68,6 +68,9 @@ jobs:
     name: Publish to npm
     needs: desktop # only publish npm if the DMG + release succeeded (keeps channels in sync)
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # required for OIDC trusted publishing (no NPM_TOKEN needed)
     steps:
       - uses: actions/checkout@v4
 
@@ -82,8 +85,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
 
       # `prepublishOnly` builds the web bundle + CLI. Publishes the version already in
-      # package.json (bumped in the release PR before tagging).
+      # package.json (bumped in the release PR before tagging). --provenance attaches a
+      # signed attestation (who built it, from which commit) — verifiable via
+      # `npm audit signatures`. Auth is via OIDC trusted publisher — no stored token.
       - name: Publish
-        run: npm publish --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --access public --provenance
