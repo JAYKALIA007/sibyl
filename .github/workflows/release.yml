@@ -80,13 +80,15 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
-          registry-url: 'https://registry.npmjs.org'
+          # No registry-url here: setup-node's registry-url writes an .npmrc with an
+          # empty _authToken which blocks the OIDC trusted publisher auth. Let npm use
+          # its native OIDC flow (triggered by --provenance + id-token:write above).
 
       - run: pnpm install --frozen-lockfile
 
       # `prepublishOnly` builds the web bundle + CLI. Publishes the version already in
-      # package.json (bumped in the release PR before tagging). --provenance attaches a
-      # signed attestation (who built it, from which commit) — verifiable via
-      # `npm audit signatures`. Auth is via OIDC trusted publisher — no stored token.
+      # package.json (bumped in the release PR before tagging). --provenance triggers
+      # the OIDC exchange with npm — auth + signed attestation in one step, no stored
+      # token. Requires the JAYKALIA007/sibyl release.yml trusted publisher on npmjs.com.
       - name: Publish
         run: npm publish --access public --provenance
