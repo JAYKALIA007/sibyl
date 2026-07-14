@@ -6,18 +6,39 @@ import { Sidebar } from './Sidebar'
 import { AddConnectionModal } from './AddConnectionModal'
 import { Onboarding } from './Onboarding'
 import { faultBus } from './faults'
-import { getSetup, waitForSidecar } from './api'
+import { getModels, getSetup, waitForSidecar } from './api'
 import { useActiveConnection, type ActiveConnection } from './useActiveConnection'
 import { currentTheme, setTheme, type Theme } from './theme'
 import { PlusIcon, DatabaseIcon, SidebarIcon } from './components/icons'
-import type { ConnectionView, Meta, Setup } from './types'
+import type { ConnectionView, Meta, ModelsInfo, Setup } from './types'
 
 const COLLAPSE_KEY = 'sibyl-sidebar-collapsed'
+const MODEL_KEY = 'sibyl-model'
+
+const NO_MODELS: ModelsInfo = { active: '', installed: [], catalog: [] }
 
 export function App() {
   const [theme, setThemeState] = useState<Theme>(currentTheme)
   // null = still probing the local LLM; gates the app behind onboarding until ready.
   const [setup, setSetup] = useState<Setup | null>(null)
+  const [models, setModels] = useState<ModelsInfo>(NO_MODELS)
+  // The chosen local model (undefined = the server default). Persisted across reloads.
+  const [selectedModel, setSelectedModel] = useState<string | undefined>(() => {
+    try {
+      return localStorage.getItem(MODEL_KEY) ?? undefined
+    } catch {
+      return undefined
+    }
+  })
+
+  function selectModel(name: string) {
+    setSelectedModel(name)
+    try {
+      localStorage.setItem(MODEL_KEY, name)
+    } catch {
+      // storage unavailable — the choice just won't persist across reloads
+    }
+  }
 
   // Resetting the thread on a connection switch needs the assistant-ui runtime, which
   // only exists inside the provider below — but activeId (read to build the provider)
@@ -27,7 +48,10 @@ export function App() {
   const conn = useActiveConnection(() => resetThreadRef.current())
 
   useEffect(() => {
-    waitForSidecar().then(() => getSetup()).then(setSetup)
+    waitForSidecar().then(() => {
+      getSetup().then(setSetup)
+      getModels().then(setModels)
+    })
   }, [])
 
   function toggleTheme() {
@@ -42,12 +66,15 @@ export function App() {
   }
 
   return (
-    <SibylRuntimeProvider activeConnectionId={conn.activeId}>
+    <SibylRuntimeProvider activeConnectionId={conn.activeId} activeModel={selectedModel}>
       <Workspace
         theme={theme}
         onToggleTheme={toggleTheme}
         conn={conn}
         resetThreadRef={resetThreadRef}
+        models={models}
+        selectedModel={selectedModel}
+        onSelectModel={selectModel}
       />
     </SibylRuntimeProvider>
   )
@@ -60,11 +87,17 @@ function Workspace({
   onToggleTheme,
   conn,
   resetThreadRef,
+  models,
+  selectedModel,
+  onSelectModel,
 }: {
   theme: Theme
   onToggleTheme: () => void
   conn: ActiveConnection
   resetThreadRef: React.MutableRefObject<() => void>
+  models: ModelsInfo
+  selectedModel: string | undefined
+  onSelectModel: (name: string) => void
 }) {
   const runtime = useAssistantRuntime()
   const [addingOpen, setAddingOpen] = useState(false)
@@ -113,6 +146,7 @@ function Workspace({
           onDeleted={conn.remove}
           theme={theme}
           onToggleTheme={onToggleTheme}
+          activeModel={selectedModel ?? models.active}
         />
       )}
 
@@ -126,7 +160,13 @@ function Workspace({
         <FaultBanner />
         <div className="min-h-0 flex-1">
           {connections === null ? null : activeId ? (
-            <Thread meta={meta} suggestions={suggestions} />
+            <Thread
+              meta={meta}
+              suggestions={suggestions}
+              models={models}
+              selectedModel={selectedModel}
+              onSelectModel={onSelectModel}
+            />
           ) : (
             <NoConnectionState hasSaved={list.length > 0} onAdd={() => setAddingOpen(true)} />
           )}

@@ -53,12 +53,12 @@ export type EngineDeps = {
   toSql: (
     ddl: string,
     question: string,
-    opts: { feedback?: Feedback; history?: Turn[]; onToken?: (t: string) => void }
+    opts: { feedback?: Feedback; history?: Turn[]; onToken?: (t: string) => void; model?: string }
   ) => Promise<{ sql: string; usage: Usage }>
   // Executor port: run guarded SQL and return rows/columns or a DB error.
   runQuery: (sql: string, conn?: Conn) => Promise<QueryResult>
   // LLM port (summarize): rows → a one-line natural-language answer.
-  summarize: (question: string, rows: any[], columns: string[]) => Promise<string>
+  summarize: (question: string, rows: any[], columns: string[], model?: string) => Promise<string>
   // The model's context window, surfaced in AskUsage.
   numCtx: number
 }
@@ -66,6 +66,7 @@ export type EngineDeps = {
 export type AskOpts = {
   onSqlToken?: (t: string) => void
   onRetry?: (attempt: number) => void
+  model?: string // which local model to generate with; defaults to CHAT_MODEL
 }
 
 export type Engine = {
@@ -129,7 +130,7 @@ export function createEngine(deps: EngineDeps): Engine {
       // A throw here is a genuine fault (model unreachable) — let it propagate so the
       // surface renders it as a fault (5xx / fault banner) rather than masking an
       // outage as a normal "couldn't build a query" result.
-      const { sql, usage } = await deps.toSql(ddl, question, { feedback, history, onToken: opts?.onSqlToken })
+      const { sql, usage } = await deps.toSql(ddl, question, { feedback, history, onToken: opts?.onSqlToken, model: opts?.model })
       if (sql === NO_ANSWER) {
         return { kind: 'refused', reason: "That can't be answered from this database's schema." }
       }
@@ -150,7 +151,7 @@ export function createEngine(deps: EngineDeps): Engine {
       // cosmetic: degrade to a row count rather than fail the whole query if it throws.
       let summary: string
       try {
-        summary = await deps.summarize(question, res.rows, res.columns)
+        summary = await deps.summarize(question, res.rows, res.columns, opts?.model)
       } catch {
         summary = summaryFallback(res.rows)
       }
@@ -189,7 +190,7 @@ export function createEngine(deps: EngineDeps): Engine {
 // The production summarize: a second, small LLM call turning result rows into a
 // one-line answer. Capped so a huge result set can't blow the context window. Empty
 // results skip the model.
-async function defaultSummarize(question: string, rows: any[], columns: string[]): Promise<string> {
+async function defaultSummarize(question: string, rows: any[], columns: string[], model?: string): Promise<string> {
   if (rows.length === 0) return 'No rows matched.'
   const preview = JSON.stringify(rows.slice(0, SUMMARY_ROW_CAP))
   const prompt =
@@ -200,6 +201,7 @@ async function defaultSummarize(question: string, rows: any[], columns: string[]
   const out = await generate(prompt, {
     temperature: 0,
     system: 'You state the answer to a question from SQL results in one concise sentence. No preamble, no markdown.',
+    model,
   })
   return out.trim()
 }

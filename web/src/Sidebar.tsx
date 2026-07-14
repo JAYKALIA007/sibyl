@@ -17,9 +17,34 @@ import {
   SunIcon,
   MoonIcon,
   MoreHorizontalIcon,
+  BookIcon,
+  MessageIcon,
 } from './components/icons'
 import type { ConnectionView } from './types'
 import type { Theme } from './theme'
+
+const REPO = 'https://github.com/JAYKALIA007/sibyl'
+const DOCS_URL = `${REPO}#readme`
+
+// Prefill a bug/feedback report with the environment so reports arrive with triage
+// context. Surface is inferred from the API base (desktop bakes in the sidecar port).
+function feedbackUrl(activeModel: string): string {
+  const surface = import.meta.env.VITE_API_URL?.includes('47821') ? 'desktop' : 'web'
+  const body = [
+    '**What happened?**',
+    '',
+    '',
+    '**What did you expect?**',
+    '',
+    '',
+    '---',
+    `- Model: ${activeModel || '(default)'}`,
+    `- Surface: ${surface}`,
+    '- OS: ',
+    '',
+  ].join('\n')
+  return `${REPO}/issues/new?labels=feedback&body=${encodeURIComponent(body)}`
+}
 
 export function Sidebar({
   connections,
@@ -32,6 +57,7 @@ export function Sidebar({
   onDeleted,
   theme,
   onToggleTheme,
+  activeModel,
 }: {
   connections: ConnectionView[]
   activeId: string | null
@@ -43,6 +69,7 @@ export function Sidebar({
   onDeleted: (id: string) => void
   theme: Theme
   onToggleTheme: () => void
+  activeModel: string
 }) {
   // A switch resets the thread, so block it (and adding) mid-run.
   const busy = useThread((t) => t.isRunning)
@@ -99,6 +126,22 @@ export function Sidebar({
       </div>
 
       <div className="border-t border-border p-2">
+        <a
+          href={DOCS_URL}
+          target="_blank"
+          rel="noreferrer"
+          className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+        >
+          <BookIcon className="text-[15px]" /> Docs
+        </a>
+        <a
+          href={feedbackUrl(activeModel)}
+          target="_blank"
+          rel="noreferrer"
+          className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+        >
+          <MessageIcon className="text-[15px]" /> Report an issue
+        </a>
         <button
           onClick={onToggleTheme}
           className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"

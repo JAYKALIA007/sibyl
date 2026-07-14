@@ -13,7 +13,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { ask, runSql, loadSchema, type Turn, type Conn } from './core.ts'
 import { close, closePool, runQuery } from './db.ts'
-import { checkOllama, CHAT_MODEL, OLLAMA } from './ollama.ts'
+import { checkOllama, listInstalledModels, MODEL_CATALOG, CHAT_MODEL, OLLAMA } from './ollama.ts'
 import { getSuggestions } from './suggestions.ts'
 import { mapResult, mapFault } from './responseMapper.ts'
 import {
@@ -72,6 +72,20 @@ app.get('/api/setup', async (_req, res) => {
     model: CHAT_MODEL,
     pullCommand: `ollama pull ${CHAT_MODEL}`,
   })
+})
+
+// The model switcher's backing: the curated catalog + which models are actually
+// pulled + the default. `active` is the default (CHAT_MODEL); the client persists
+// its own choice and sends it per /api/ask. `installed` is empty (not an error) when
+// Ollama is unreachable — the UI degrades to "catalog only, nothing selectable yet".
+app.get('/api/models', async (_req, res) => {
+  let installed: string[] = []
+  try {
+    installed = await listInstalledModels()
+  } catch {
+    // Ollama down → no installed list; onboarding/fault paths surface the reason.
+  }
+  res.json({ active: CHAT_MODEL, installed, catalog: MODEL_CATALOG })
 })
 
 // ── connection registry ──────────────────────────────────────────────────────
@@ -182,10 +196,11 @@ app.get('/api/suggestions', async (req, res) => {
 })
 
 app.post('/api/ask', async (req, res) => {
-  const { question, history, connectionId } = (req.body ?? {}) as {
+  const { question, history, connectionId, model } = (req.body ?? {}) as {
     question?: unknown
     history?: unknown
     connectionId?: unknown
+    model?: unknown
   }
 
   if (typeof question !== 'string' || !question.trim()) {
@@ -195,9 +210,10 @@ app.post('/api/ask', async (req, res) => {
   const conn = resolveConn(connectionId, res)
   if (!conn) return
   const turns: Turn[] = Array.isArray(history) ? (history as Turn[]) : []
+  const modelOpt = typeof model === 'string' && model ? model : undefined
 
   try {
-    const { status, body } = mapResult(await ask(question, turns, conn))
+    const { status, body } = mapResult(await ask(question, turns, conn, { model: modelOpt }))
     res.status(status).json(body)
   } catch (err) {
     // A genuine fault (Ollama unreachable, DB dead, core threw) → 5xx, distinct
@@ -212,10 +228,11 @@ app.post('/api/ask', async (req, res) => {
 // The GUI reads this to render SQL live; the non-streaming /api/ask path is kept for
 // callers that don't need incremental output.
 app.post('/api/ask/stream', async (req, res) => {
-  const { question, history, connectionId } = (req.body ?? {}) as {
+  const { question, history, connectionId, model } = (req.body ?? {}) as {
     question?: unknown
     history?: unknown
     connectionId?: unknown
+    model?: unknown
   }
 
   if (typeof question !== 'string' || !question.trim()) {
@@ -225,6 +242,7 @@ app.post('/api/ask/stream', async (req, res) => {
   const conn = resolveConn(connectionId, res)
   if (!conn) return
   const turns: Turn[] = Array.isArray(history) ? (history as Turn[]) : []
+  const modelOpt = typeof model === 'string' && model ? model : undefined
 
   res.setHeader('Content-Type', 'text/event-stream')
   res.setHeader('Cache-Control', 'no-cache')
@@ -237,6 +255,7 @@ app.post('/api/ask/stream', async (req, res) => {
     const result = await ask(question, turns, conn, {
       onSqlToken: (token) => emit({ type: 'sql_token', token }),
       onRetry: (attempt) => emit({ type: 'retry', attempt }),
+      model: modelOpt,
     })
     emit({ type: 'result', data: result })
   } catch (err) {

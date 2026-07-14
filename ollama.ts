@@ -12,6 +12,18 @@ const OLLAMA = process.env.OLLAMA_HOST || 'http://localhost:11434'
 export const CHAT_MODEL = process.env.SIBYL_CHAT_MODEL || 'qwen2.5-coder'
 export const EMBED_MODEL = process.env.SIBYL_EMBED_MODEL || 'nomic-embed-text'
 
+// The curated set of local coding models we recommend + have tested for SQL. The
+// switcher shows these; a user can still run any other installed model (off-catalog,
+// surfaced with a "not tested" note). All are pullable via Ollama.
+export type CatalogModel = { name: string; label: string; description: string; size: string }
+export const MODEL_CATALOG: CatalogModel[] = [
+  { name: 'qwen2.5-coder', label: 'Qwen2.5 Coder', description: 'Default. Strong, proven SQL generation; scales down to 8 GB.', size: '~4.7 GB' },
+  { name: 'qwen3-coder', label: 'Qwen3 Coder', description: "2026's best-in-class local coder. Needs ~16 GB.", size: '~9–12 GB' },
+  { name: 'deepseek-coder-v2', label: 'DeepSeek Coder V2', description: 'Strong reasoning — shines on gnarly multi-join / subquery SQL.', size: '~9 GB' },
+  { name: 'codestral', label: 'Codestral', description: "Mistral's dedicated 22B coder. Needs ~16 GB VRAM.", size: '~13 GB' },
+  { name: 'llama3.1', label: 'Llama 3.1', description: 'Popular general model — the one most people already have.', size: '~4.9 GB' },
+]
+
 // Ollama's runtime default context window is only 2048 tokens, regardless of what
 // the model actually supports (qwen2.5-coder → 32768). Without setting num_ctx we'd
 // silently run at 1/16th of the real window — the schema DDL alone can approach the
@@ -23,6 +35,7 @@ export { OLLAMA }
 type GenerateOptions = {
   temperature?: number // 0 = deterministic (used by the eval)
   system?: string
+  model?: string // per-request override of CHAT_MODEL (the switcher); defaults to it
 }
 
 // Is `wanted` among the pulled models? Ollama tags models as `name:tag` (e.g.
@@ -39,15 +52,21 @@ export type OllamaStatus =
   | { ok: false; reason: 'unreachable'; error: string }
   | { ok: false; reason: 'model-missing'; model: string; models: string[] }
 
+// The pulled models Ollama reports, bare names (e.g. `qwen2.5-coder:latest`). Throws
+// on an unreachable Ollama so callers can distinguish "none installed" from "down".
+export async function listInstalledModels(): Promise<string[]> {
+  const res = await fetch(`${OLLAMA}/api/tags`, { signal: AbortSignal.timeout(4000) })
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  const data = (await res.json()) as { models?: { name: string }[] }
+  return (data.models ?? []).map((m) => m.name)
+}
+
 // Preflight: is Ollama up and is the chat model pulled? Callers turn this into
 // actionable guidance instead of a raw fetch error deep in the first question.
 export async function checkOllama(): Promise<OllamaStatus> {
   let models: string[]
   try {
-    const res = await fetch(`${OLLAMA}/api/tags`, { signal: AbortSignal.timeout(4000) })
-    if (!res.ok) return { ok: false, reason: 'unreachable', error: `HTTP ${res.status}` }
-    const data = (await res.json()) as { models?: { name: string }[] }
-    models = (data.models ?? []).map((m) => m.name)
+    models = await listInstalledModels()
   } catch (e) {
     return { ok: false, reason: 'unreachable', error: (e as Error).message }
   }
@@ -72,7 +91,7 @@ export async function generateWithUsage(
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      model: CHAT_MODEL,
+      model: opts.model || CHAT_MODEL,
       prompt,
       system: opts.system,
       stream: false,
@@ -112,7 +131,7 @@ export async function generateStream(
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      model: CHAT_MODEL,
+      model: opts.model || CHAT_MODEL,
       prompt,
       system: opts.system,
       stream: true,
