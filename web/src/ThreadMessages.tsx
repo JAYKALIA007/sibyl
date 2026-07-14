@@ -6,7 +6,7 @@
 import { MessagePrimitive, useMessage } from '@assistant-ui/react'
 import { AssistantAnswer } from './AssistantAnswer'
 import { CommandAnswer } from './CommandAnswer'
-import { readCommand, readResult } from './messageContract'
+import { readCommand, readResult, readStreamingSql } from './messageContract'
 import { SparkleIcon } from './components/icons'
 
 export function UserMessage() {
@@ -23,6 +23,7 @@ export function UserMessage() {
 export function AssistantMessage() {
   const result = useMessage((m) => readResult(m.metadata.custom))
   const command = useMessage((m) => readCommand(m.metadata.custom))
+  const streamingSql = useMessage((m) => readStreamingSql(m.metadata.custom))
   const isRunning = useMessage((m) => m.status?.type === 'running')
 
   // A finished assistant turn with no result and no command means the run threw a
@@ -40,11 +41,25 @@ export function AssistantMessage() {
           <AssistantAnswer result={result} />
         ) : command ? (
           <CommandAnswer command={command} />
+        ) : streamingSql ? (
+          <StreamingSql sql={streamingSql} />
         ) : (
           <Thinking />
         )}
       </div>
     </MessagePrimitive.Root>
+  )
+}
+
+function StreamingSql({ sql }: { sql: string }) {
+  return (
+    <div className="text-sm">
+      <span className="text-xs font-medium text-muted-foreground">SQL</span>
+      <pre className="mt-1 whitespace-pre-wrap break-all font-mono text-xs text-foreground/80">
+        {sql}
+        <span className="ml-0.5 animate-pulse text-primary">▋</span>
+      </pre>
+    </div>
   )
 }
 

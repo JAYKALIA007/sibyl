@@ -4,11 +4,11 @@ import {
   useLocalRuntime,
   type ChatModelAdapter,
 } from '@assistant-ui/react'
-import { ask, getSchema, runSql, SibylFault } from './api'
+import { askStream, getSchema, runSql, SibylFault } from './api'
 import { faultBus } from './faults'
 import { deriveHistory, type HistoryMessage } from './history'
 import { routeMessage } from './messageRouting'
-import { askMeta, commandMeta, readResult } from './messageContract'
+import { askMeta, commandMeta, streamingMeta, readResult } from './messageContract'
 import type { AskResult, CommandResult } from './types'
 
 type RunMessage = { role: string; content: readonly unknown[]; metadata?: { custom?: unknown } }
@@ -97,7 +97,7 @@ function commandFallbackText(result: CommandResult): string {
 // The thread resets on switch (App), so no in-flight run straddles two DBs.
 function makeAdapter(connRef: { current: string | null }): ChatModelAdapter {
   return {
-    async run({ messages }) {
+    async *run({ messages }) {
       const connectionId = connRef.current
       if (!connectionId) throw new SibylFault('no active connection')
 
@@ -118,18 +118,58 @@ function makeAdapter(connRef: { current: string | null }): ChatModelAdapter {
               ? await runSqlCommand(route.query, connectionId)
               : await runCommand(route.name as 'schema' | 'tables' | 'help', connectionId)
           faultBus.emit(null)
-          return {
-            content: [{ type: 'text', text: commandFallbackText(result) }],
+          yield {
+            content: [{ type: 'text' as const, text: commandFallbackText(result) }],
             metadata: { custom: commandMeta(result) },
           }
+          return
         }
-        const result = await ask(question, history, connectionId)
-        faultBus.emit(null) // a success clears any stale connection banner
-        // The full result rides along in metadata.custom; the assistant message reads
-        // it to render SQL + table + summary + meter.
-        return {
-          content: [{ type: 'text', text: fallbackText(result) }],
-          metadata: { custom: askMeta(result) },
+
+        // NL→SQL with live token streaming. We bridge the push-based onSqlToken
+        // callback into the pull-based async generator using a pendingNotify flag so
+        // no notification is lost even if a token arrives before the next await.
+        let sqlSoFar = ''
+        let done = false
+        let finalResult: import('./types').AskResult | null = null
+        let streamError: unknown = null
+        let pendingNotify = false
+        let notifyResolver: (() => void) | null = null
+
+        const notify = () => {
+          if (notifyResolver) { notifyResolver(); notifyResolver = null }
+          else { pendingNotify = true }
+        }
+        const waitForUpdate = () => {
+          if (pendingNotify) { pendingNotify = false; return Promise.resolve() }
+          return new Promise<void>((r) => { notifyResolver = r })
+        }
+
+        askStream(question, history, connectionId, {
+          onSqlToken: (t) => { sqlSoFar += t; notify() },
+          onRetry: () => { sqlSoFar = ''; notify() },
+        })
+          .then((r) => { finalResult = r; done = true; notify() })
+          .catch((e) => { streamError = e; done = true; notify() })
+
+        while (!done) {
+          await waitForUpdate()
+          if (sqlSoFar) {
+            yield {
+              content: [{ type: 'text' as const, text: sqlSoFar }],
+              metadata: { custom: streamingMeta(sqlSoFar) },
+            }
+          }
+        }
+
+        if (streamError) {
+          if (streamError instanceof SibylFault) throw streamError
+          throw new SibylFault(`stream error: ${String(streamError)}`)
+        }
+
+        faultBus.emit(null)
+        yield {
+          content: [{ type: 'text' as const, text: fallbackText(finalResult!) }],
+          metadata: { custom: askMeta(finalResult!) },
         }
       } catch (e) {
         // A genuine fault (5xx / network) is a connection problem, not a chat message.

@@ -35,6 +35,74 @@ export async function ask(
   return body as AskResult
 }
 
+// Streaming variant — POSTs the same body as ask() but reads back an SSE stream.
+// Fires onSqlToken for each token as the model generates SQL, onRetry on each
+// retry attempt, and resolves with the final AskResult.
+export type AskStreamCallbacks = {
+  onSqlToken?: (token: string) => void
+  onRetry?: (attempt: number) => void
+}
+
+export async function askStream(
+  question: string,
+  history: Turn[],
+  connectionId: string,
+  callbacks: AskStreamCallbacks = {},
+): Promise<AskResult> {
+  let res: Response
+  try {
+    res = await fetch(`${API}/ask/stream`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ question, history, connectionId }),
+    })
+  } catch (e) {
+    throw new SibylFault(`network error: ${String(e)}`)
+  }
+
+  if (!res.ok) {
+    const body = (await res.json().catch(() => null)) as Fault | null
+    throw new SibylFault(body?.error ?? `server error ${res.status}`)
+  }
+
+  const reader = res.body!.getReader()
+  const decoder = new TextDecoder()
+  let buf = ''
+  let finalResult: AskResult | null = null
+
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+
+    buf += decoder.decode(value, { stream: true })
+    const lines = buf.split('\n')
+    buf = lines.pop() ?? ''
+
+    for (const line of lines) {
+      if (!line.startsWith('data: ')) continue
+      let event: { type: string; token?: string; attempt?: number; data?: AskResult; error?: string }
+      try {
+        event = JSON.parse(line.slice(6))
+      } catch {
+        continue
+      }
+
+      if (event.type === 'sql_token' && event.token !== undefined) {
+        callbacks.onSqlToken?.(event.token)
+      } else if (event.type === 'retry' && event.attempt !== undefined) {
+        callbacks.onRetry?.(event.attempt)
+      } else if (event.type === 'result' && event.data) {
+        finalResult = event.data
+      } else if (event.type === 'error') {
+        throw new SibylFault(event.error ?? 'stream error')
+      }
+    }
+  }
+
+  if (!finalResult) throw new SibylFault('stream ended without a result')
+  return finalResult
+}
+
 // Local-LLM readiness for the onboarding gate. Treats a network failure as
 // 'unreachable' (same as the server would) so first-run always has something to show.
 export async function getSetup(): Promise<Setup> {
