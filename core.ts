@@ -53,7 +53,7 @@ export type EngineDeps = {
   toSql: (
     ddl: string,
     question: string,
-    opts: { feedback?: Feedback; history?: Turn[] }
+    opts: { feedback?: Feedback; history?: Turn[]; onToken?: (t: string) => void }
   ) => Promise<{ sql: string; usage: Usage }>
   // Executor port: run guarded SQL and return rows/columns or a DB error.
   runQuery: (sql: string, conn?: Conn) => Promise<QueryResult>
@@ -63,9 +63,14 @@ export type EngineDeps = {
   numCtx: number
 }
 
+export type AskOpts = {
+  onSqlToken?: (t: string) => void
+  onRetry?: (attempt: number) => void
+}
+
 export type Engine = {
   loadSchema: (conn?: Conn, force?: boolean) => Promise<string>
-  ask: (question: string, history?: Turn[], conn?: Conn) => Promise<AskResult>
+  ask: (question: string, history?: Turn[], conn?: Conn, opts?: AskOpts) => Promise<AskResult>
   runSql: (sql: string, conn?: Conn) => Promise<SqlOutcome>
 }
 
@@ -111,7 +116,7 @@ export function createEngine(deps: EngineDeps): Engine {
   // `history` is the surface's conversation buffer (prior successful turns). The core
   // itself holds NO conversation state — each surface owns and passes its own, so the
   // same core can serve many concurrent sessions (see docs/adr/0001).
-  async function ask(question: string, history: Turn[] = [], conn?: Conn): Promise<AskResult> {
+  async function ask(question: string, history: Turn[] = [], conn?: Conn, opts?: AskOpts): Promise<AskResult> {
     const ddl = await loadSchema(conn)
 
     let feedback: Feedback | undefined
@@ -119,11 +124,12 @@ export function createEngine(deps: EngineDeps): Engine {
 
     while (attempts < MAX_ATTEMPTS) {
       attempts++
+      if (attempts > 1) opts?.onRetry?.(attempts)
 
       // A throw here is a genuine fault (model unreachable) — let it propagate so the
       // surface renders it as a fault (5xx / fault banner) rather than masking an
       // outage as a normal "couldn't build a query" result.
-      const { sql, usage } = await deps.toSql(ddl, question, { feedback, history })
+      const { sql, usage } = await deps.toSql(ddl, question, { feedback, history, onToken: opts?.onSqlToken })
       if (sql === NO_ANSWER) {
         return { kind: 'refused', reason: "That can't be answered from this database's schema." }
       }

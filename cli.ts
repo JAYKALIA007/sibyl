@@ -275,9 +275,27 @@ async function repl(): Promise<void> {
 
     // ── NL → SQL → run ────────────────────────────────────────────────────────
     const t0 = Date.now()
-    const stopSpinner = startSpinner('Thinking…')
-    const result = await ask(question, history)
-    stopSpinner()
+
+    // Stream SQL tokens live as the model generates them. The header is printed on
+    // the first token so a refusal (NO_ANSWER, suppressed by the lookahead buffer)
+    // leaves no orphaned prefix on screen.
+    let sqlHeaderPrinted = false
+    const result = await ask(question, history, undefined, {
+      onSqlToken: (t) => {
+        if (!sqlHeaderPrinted) {
+          process.stdout.write('\n' + c.dim('  SQL: '))
+          sqlHeaderPrinted = true
+        }
+        process.stdout.write(c.dim(t))
+      },
+      onRetry: (attempt) => {
+        if (sqlHeaderPrinted) process.stdout.write('\n')
+        console.log(c.dim(`  ↩  attempt ${attempt}`))
+        sqlHeaderPrinted = false
+      },
+    })
+    if (sqlHeaderPrinted) process.stdout.write('\n')
+
     const elapsed = ((Date.now() - t0) / 1000).toFixed(1)
 
     if (result.kind === 'refused') {
@@ -291,10 +309,6 @@ async function repl(): Promise<void> {
       continue
     }
 
-    const retryNote = result.attempts > 1 ? c.dim(` (${result.attempts} attempts)`) : ''
-
-    console.log()
-    console.log(c.dim(`  SQL: ${result.sql.replace(/\s+/g, ' ')}`) + retryNote)
     console.log()
     console.log(renderTable(result.columns, result.rows).replace(/^/gm, '  '))
     console.log()
