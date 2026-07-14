@@ -1,0 +1,12 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "sibyl-dev",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["run", "start"],
+      "port": 3001,
+      "autoPort": true
+    }
+  ]
+}

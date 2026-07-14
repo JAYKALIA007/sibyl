@@ -207,6 +207,46 @@ app.post('/api/ask', async (req, res) => {
   }
 })
 
+// Streaming variant of /api/ask — same body, SSE response. Emits sql_token events
+// as the model generates SQL, then a final result event with the full AskResult.
+// The GUI reads this to render SQL live; the non-streaming /api/ask path is kept for
+// callers that don't need incremental output.
+app.post('/api/ask/stream', async (req, res) => {
+  const { question, history, connectionId } = (req.body ?? {}) as {
+    question?: unknown
+    history?: unknown
+    connectionId?: unknown
+  }
+
+  if (typeof question !== 'string' || !question.trim()) {
+    res.status(400).json({ kind: 'fault', error: 'question (non-empty string) is required' })
+    return
+  }
+  const conn = resolveConn(connectionId, res)
+  if (!conn) return
+  const turns: Turn[] = Array.isArray(history) ? (history as Turn[]) : []
+
+  res.setHeader('Content-Type', 'text/event-stream')
+  res.setHeader('Cache-Control', 'no-cache')
+  res.setHeader('Connection', 'keep-alive')
+  res.flushHeaders()
+
+  const emit = (event: object) => res.write(`data: ${JSON.stringify(event)}\n\n`)
+
+  try {
+    const result = await ask(question, turns, conn, {
+      onSqlToken: (token) => emit({ type: 'sql_token', token }),
+      onRetry: (attempt) => emit({ type: 'retry', attempt }),
+    })
+    emit({ type: 'result', data: result })
+  } catch (err) {
+    const { body } = mapFault(err)
+    emit({ type: 'error', error: body.error })
+  } finally {
+    res.end()
+  }
+})
+
 // The /sql escape hatch — run raw user SQL through the same read-only guard. No LLM,
 // so all outcomes (rows / rejected-by-guard / DB error) are a plain 200; only a
 // genuine fault (DB unreachable) is a 5xx.

@@ -10,8 +10,9 @@
 import type { AskResult, CommandResult } from './types'
 
 export type SibylMeta =
-  | { result: AskResult; command?: never }
-  | { command: CommandResult; result?: never }
+  | { result: AskResult; command?: never; streamingSql?: never }
+  | { command: CommandResult; result?: never; streamingSql?: never }
+  | { streamingSql: string; result?: never; command?: never }
 
 // Producer side (runtime): build the metadata for each message kind.
 export function askMeta(result: AskResult): SibylMeta {
@@ -19,6 +20,9 @@ export function askMeta(result: AskResult): SibylMeta {
 }
 export function commandMeta(command: CommandResult): SibylMeta {
   return { command }
+}
+export function streamingMeta(sql: string): SibylMeta {
+  return { streamingSql: sql }
 }
 
 // Consumer side (thread, history derivation): read one field from the untyped
@@ -29,4 +33,7 @@ export function readResult(custom: unknown): AskResult | null {
 }
 export function readCommand(custom: unknown): CommandResult | null {
   return (custom as Partial<SibylMeta> | null | undefined)?.command ?? null
+}
+export function readStreamingSql(custom: unknown): string | null {
+  return (custom as Partial<SibylMeta> | null | undefined)?.streamingSql ?? null
 }
