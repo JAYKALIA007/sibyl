@@ -1,6 +1,6 @@
 {
   "name": "sibyl-cli",
-  "version": "0.7.3",
+  "version": "0.8.0",
   "description": "Ask your database in plain English — a from-scratch, local-first natural-language-to-SQL tool.",
   "type": "module",
   "bin": {
