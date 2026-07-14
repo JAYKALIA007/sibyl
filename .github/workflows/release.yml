@@ -70,25 +70,26 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      id-token: write # required for OIDC trusted publishing (no NPM_TOKEN needed)
+      id-token: write # required for OIDC trusted publishing — no NPM_TOKEN needed
     steps:
       - uses: actions/checkout@v4
 
       - uses: pnpm/action-setup@v4 # version comes from packageManager in package.json
 
+      # Node 24 ships with npm ≥ 11.5.1, which is the minimum required for OIDC
+      # trusted publisher auth. Node 22's npm 10.x does not support it.
+      # package-manager-cache disabled to prevent cache poisoning with OIDC tokens.
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
           cache: pnpm
-          # No registry-url here: setup-node's registry-url writes an .npmrc with an
-          # empty _authToken which blocks the OIDC trusted publisher auth. Let npm use
-          # its native OIDC flow (triggered by --provenance + id-token:write above).
+          registry-url: 'https://registry.npmjs.org'
+          package-manager-cache: false
 
       - run: pnpm install --frozen-lockfile
 
-      # `prepublishOnly` builds the web bundle + CLI. Publishes the version already in
-      # package.json (bumped in the release PR before tagging). --provenance triggers
-      # the OIDC exchange with npm — auth + signed attestation in one step, no stored
-      # token. Requires the JAYKALIA007/sibyl release.yml trusted publisher on npmjs.com.
+      # Auth is handled automatically by npm 11.5.1+ via the OIDC trusted publisher
+      # configured on npmjs.com (JAYKALIA007/sibyl → release.yml → npm publish).
+      # Provenance is also generated automatically — no --provenance flag needed.
       - name: Publish
-        run: npm publish --access public --provenance
+        run: npm publish --access public
