@@ -100,6 +100,89 @@ export async function generate(prompt: string, opts: GenerateOptions = {}): Prom
   return text
 }
 
+// Streaming variant — calls onToken for each chunk as it arrives, then returns the
+// full text + usage. Uses a 9-char lookahead buffer so the NO_ANSWER sentinel is
+// never forwarded to onToken; callers see tokens only for real SQL responses.
+export async function generateStream(
+  prompt: string,
+  opts: GenerateOptions & { onToken: (chunk: string) => void }
+): Promise<{ text: string; usage: Usage }> {
+  const NO_ANSWER_SENTINEL = 'NO_ANSWER' // 9 chars
+  const res = await fetch(`${OLLAMA}/api/generate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: CHAT_MODEL,
+      prompt,
+      system: opts.system,
+      stream: true,
+      options: {
+        num_ctx: NUM_CTX,
+        ...(opts.temperature === undefined ? {} : { temperature: opts.temperature }),
+      },
+    }),
+  })
+  if (!res.ok) throw new Error(`generate failed: ${res.status} ${await res.text()}`)
+
+  const reader = res.body!.getReader()
+  const decoder = new TextDecoder()
+  let rawBuf = '' // partial NDJSON lines between read() calls
+  let fullText = ''
+  let usage: Usage = {}
+
+  // Accumulate in lookahead until we have enough chars to rule out NO_ANSWER.
+  // Once ruled out, stream remaining tokens directly to onToken.
+  let lookahead = ''
+  let sentinelRuledOut = false
+
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+
+    rawBuf += decoder.decode(value, { stream: true })
+    const lines = rawBuf.split('\n')
+    rawBuf = lines.pop() ?? ''
+
+    for (const line of lines) {
+      if (!line.trim()) continue
+      let chunk: { response: string; done: boolean; prompt_eval_count?: number; eval_count?: number }
+      try {
+        chunk = JSON.parse(line)
+      } catch {
+        continue
+      }
+
+      fullText += chunk.response
+
+      if (chunk.done) {
+        usage = { promptTokens: chunk.prompt_eval_count, outputTokens: chunk.eval_count }
+        // Flush remaining lookahead if the model finished before we could rule out the sentinel
+        // (e.g. very short response). Suppress if it is the sentinel.
+        if (!sentinelRuledOut && lookahead.trim() !== NO_ANSWER_SENTINEL) {
+          opts.onToken(lookahead)
+        }
+        continue
+      }
+
+      if (sentinelRuledOut) {
+        opts.onToken(chunk.response)
+        continue
+      }
+
+      lookahead += chunk.response
+      if (lookahead.trimStart().length >= NO_ANSWER_SENTINEL.length) {
+        sentinelRuledOut = true
+        if (!lookahead.trimStart().startsWith(NO_ANSWER_SENTINEL)) {
+          opts.onToken(lookahead)
+        }
+        // Starts with NO_ANSWER → suppress; sentinel is never forwarded.
+      }
+    }
+  }
+
+  return { text: fullText.trim(), usage }
+}
+
 // Turn text into a meaning-vector. Not needed for v1 SQL generation, but the seam
 // is here for schema-RAG later (retrieving only relevant tables on huge schemas).
 export async function embed(text: string): Promise<number[]> {

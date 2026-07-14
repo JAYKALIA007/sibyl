@@ -3,7 +3,7 @@
 // — important for the eval. Emits the sentinel NO_ANSWER when the question can't be
 // answered from the schema (the core engine turns that into a graceful refusal).
 
-import { generateWithUsage, type Usage } from './ollama.ts'
+import { generateWithUsage, generateStream, type Usage } from './ollama.ts'
 import { isMain } from './isMain.ts'
 
 export const NO_ANSWER = 'NO_ANSWER'
@@ -56,12 +56,17 @@ function extractSql(raw: string): string {
 export async function toSql(
   ddl: string,
   question: string,
-  opts: { temperature?: number; feedback?: Feedback; history?: Turn[] } = {}
+  opts: { temperature?: number; feedback?: Feedback; history?: Turn[]; onToken?: (t: string) => void } = {}
 ): Promise<{ sql: string; usage: Usage }> {
-  const { text, usage } = await generateWithUsage(
-    buildPrompt(ddl, question, { feedback: opts.feedback, history: opts.history }),
-    { temperature: opts.temperature ?? 0, system: SYSTEM }
-  )
+  const prompt = buildPrompt(ddl, question, { feedback: opts.feedback, history: opts.history })
+  const genOpts = { temperature: opts.temperature ?? 0, system: SYSTEM }
+
+  if (opts.onToken) {
+    const { text, usage } = await generateStream(prompt, { ...genOpts, onToken: opts.onToken })
+    return { sql: extractSql(text), usage }
+  }
+
+  const { text, usage } = await generateWithUsage(prompt, genOpts)
   return { sql: extractSql(text), usage }
 }
 
