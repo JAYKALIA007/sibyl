@@ -3,7 +3,7 @@
 // theme toggle. Connection switching + adding are disabled while a turn is in flight
 // (a switch resets the thread — see App).
 
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useThread } from '@assistant-ui/react'
 import { cn } from './lib/utils'
 import { renameConnection, deleteConnection } from './api'
@@ -16,6 +16,7 @@ import {
   SidebarIcon,
   SunIcon,
   MoonIcon,
+  MoreHorizontalIcon,
 } from './components/icons'
 import type { ConnectionView } from './types'
 import type { Theme } from './theme'
@@ -206,42 +207,74 @@ function ConnectionRow({
           </button>
         </div>
       ) : (
-        // Hover actions — hidden until you hover the row (or focus within), never
-        // block the label, and disabled while a turn is running.
-        <div className="absolute right-1 top-1.5 hidden items-center gap-0.5 group-hover:flex group-focus-within:flex">
-          <IconAction label="Rename" disabled={busy} onClick={() => { setName(conn.name); setMode('rename') }}>
-            <PencilIcon className="text-[13px]" />
-          </IconAction>
-          <IconAction label="Delete" disabled={busy} onClick={() => setMode('confirmDelete')}>
-            <TrashIcon className="text-[13px]" />
-          </IconAction>
+        <div className="absolute right-1 top-1.5 hidden group-hover:flex group-focus-within:flex">
+          <OverflowMenu
+            disabled={busy}
+            onRename={() => { setName(conn.name); setMode('rename') }}
+            onDelete={() => setMode('confirmDelete')}
+          />
         </div>
       )}
     </li>
   )
 }
 
-function IconAction({
-  label,
+function OverflowMenu({
   disabled,
-  onClick,
-  children,
+  onRename,
+  onDelete,
 }: {
-  label: string
   disabled: boolean
-  onClick: () => void
-  children: React.ReactNode
+  onRename: () => void
+  onDelete: () => void
 }) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    function handlePointerDown(e: PointerEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false)
+      }
+    }
+    document.addEventListener('pointerdown', handlePointerDown)
+    return () => document.removeEventListener('pointerdown', handlePointerDown)
+  }, [open])
+
   return (
-    <button
-      type="button"
-      aria-label={label}
-      title={label}
-      disabled={disabled}
-      onClick={onClick}
-      className="flex h-6 w-6 items-center justify-center rounded-md bg-panel text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-40"
-    >
-      {children}
-    </button>
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        aria-label="More options"
+        title="More options"
+        disabled={disabled}
+        onClick={(e) => { e.stopPropagation(); setOpen((v) => !v) }}
+        className="flex h-6 w-6 items-center justify-center rounded-md bg-panel text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-40"
+      >
+        <MoreHorizontalIcon className="text-[15px]" />
+      </button>
+
+      {open && (
+        <div className="absolute right-0 top-7 z-50 min-w-[120px] rounded-lg border border-border bg-panel py-1 shadow-md">
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); setOpen(false); onRename() }}
+            className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-foreground transition-colors hover:bg-muted"
+          >
+            <PencilIcon className="text-[13px] text-muted-foreground" />
+            Rename
+          </button>
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); setOpen(false); onDelete() }}
+            className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-destructive transition-colors hover:bg-muted"
+          >
+            <TrashIcon className="text-[13px]" />
+            Delete
+          </button>
+        </div>
+      )}
+    </div>
   )
 }
