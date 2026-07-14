@@ -6,7 +6,7 @@ import { Sidebar } from './Sidebar'
 import { AddConnectionModal } from './AddConnectionModal'
 import { Onboarding } from './Onboarding'
 import { faultBus } from './faults'
-import { getSetup } from './api'
+import { getSetup, waitForSidecar } from './api'
 import { useActiveConnection, type ActiveConnection } from './useActiveConnection'
 import { currentTheme, setTheme, type Theme } from './theme'
 import { PlusIcon, DatabaseIcon, SidebarIcon } from './components/icons'
@@ -27,7 +27,7 @@ export function App() {
   const conn = useActiveConnection(() => resetThreadRef.current())
 
   useEffect(() => {
-    getSetup().then(setSetup)
+    waitForSidecar().then(() => getSetup()).then(setSetup)
   }, [])
 
   function toggleTheme() {

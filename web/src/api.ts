@@ -105,6 +105,25 @@ export async function askStream(
 
 // Local-LLM readiness for the onboarding gate. Treats a network failure as
 // 'unreachable' (same as the server would) so first-run always has something to show.
+// Poll /api/health until the sidecar is listening (needed for desktop: Tauri spawns
+// the Node sidecar concurrently with the webview, so the first fetch can race).
+// Resolves as soon as health returns 200; gives up after `timeoutMs` and continues
+// (getSetup will surface the real error state).
+export async function waitForSidecar(timeoutMs = 8000): Promise<void> {
+  const deadline = Date.now() + timeoutMs
+  let delay = 50
+  while (Date.now() < deadline) {
+    try {
+      const res = await fetch(`${API}/health`)
+      if (res.ok) return
+    } catch {
+      // sidecar not up yet
+    }
+    await new Promise((r) => setTimeout(r, delay))
+    delay = Math.min(delay * 1.5, 500)
+  }
+}
+
 export async function getSetup(): Promise<Setup> {
   try {
     const res = await fetch(`${API}/setup`)
