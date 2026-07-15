@@ -13,7 +13,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { ask, runSql, loadSchema, type Turn, type Conn } from './core.ts'
 import { close, closePool, runQuery } from './db.ts'
-import { checkOllama, listInstalledModels, MODEL_CATALOG, CHAT_MODEL, OLLAMA } from './ollama.ts'
+import { checkOllama, listInstalledModels, pullModel, MODEL_CATALOG, CHAT_MODEL, OLLAMA } from './ollama.ts'
 import { getSuggestions } from './suggestions.ts'
 import { mapResult, mapFault } from './responseMapper.ts'
 import {
@@ -86,6 +86,33 @@ app.get('/api/models', async (_req, res) => {
     // Ollama down → no installed list; onboarding/fault paths surface the reason.
   }
   res.json({ active: CHAT_MODEL, installed, catalog: MODEL_CATALOG })
+})
+
+// Pull a model, streaming Ollama's download progress back as SSE. Only catalog
+// models are pullable from the UI (the switcher's Download affordance), so we
+// gate on the catalog rather than accepting an arbitrary name to shell to Ollama.
+app.post('/api/models/pull', async (req, res) => {
+  const { name } = (req.body ?? {}) as { name?: unknown }
+  if (typeof name !== 'string' || !MODEL_CATALOG.some((m) => m.name === name)) {
+    res.status(400).json({ kind: 'fault', error: 'unknown or missing model name' })
+    return
+  }
+
+  res.setHeader('Content-Type', 'text/event-stream')
+  res.setHeader('Cache-Control', 'no-cache')
+  res.setHeader('Connection', 'keep-alive')
+  res.flushHeaders()
+
+  const emit = (event: object) => res.write(`data: ${JSON.stringify(event)}\n\n`)
+
+  try {
+    await pullModel(name, (p) => emit({ type: 'progress', ...p }))
+    emit({ type: 'done' })
+  } catch (err) {
+    emit({ type: 'error', error: (err as Error).message })
+  } finally {
+    res.end()
+  }
 })
 
 // ── connection registry ──────────────────────────────────────────────────────

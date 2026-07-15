@@ -9,7 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Local model switcher: choose the model from a curated catalog above the composer, with a one-time download hint for models that aren't pulled yet.
+- Local model switcher: choose the model from a curated catalog above the composer.
+- In-app model download: pull a not-installed catalog model straight from the switcher with a live progress bar, no terminal needed.
 - Docs and "Report an issue" links in the sidebar footer (the issue report is prefilled with the active model and surface).
 - Add this changelog to track human-curated release notes going forward.
 

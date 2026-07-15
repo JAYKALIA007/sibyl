@@ -215,6 +215,50 @@ export async function embed(text: string): Promise<number[]> {
   return data.embedding
 }
 
+// One progress update from a model pull. `total`/`completed` are per-layer byte
+// counts (Ollama pulls layer by layer), so they reset as each layer starts.
+export type PullProgress = { status: string; total?: number; completed?: number }
+
+// Pull a model via Ollama, streaming progress to onProgress. Resolves when the pull
+// finishes (Ollama's final `status: success`), throws on an error line or HTTP error.
+// Ollama caches partial layers, so a re-pull after a disconnect resumes.
+export async function pullModel(
+  name: string,
+  onProgress: (p: PullProgress) => void
+): Promise<void> {
+  const res = await fetch(`${OLLAMA}/api/pull`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ model: name, stream: true }),
+  })
+  if (!res.ok) throw new Error(`pull failed: ${res.status} ${await res.text()}`)
+
+  const reader = res.body!.getReader()
+  const decoder = new TextDecoder()
+  let buf = ''
+
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+    buf += decoder.decode(value, { stream: true })
+    const lines = buf.split('\n')
+    buf = lines.pop() ?? ''
+    for (const line of lines) {
+      if (!line.trim()) continue
+      let chunk: { status?: string; error?: string; total?: number; completed?: number }
+      try {
+        chunk = JSON.parse(line)
+      } catch {
+        continue
+      }
+      if (chunk.error) throw new Error(chunk.error)
+      if (chunk.status) {
+        onProgress({ status: chunk.status, total: chunk.total, completed: chunk.completed })
+      }
+    }
+  }
+}
+
 // Self-test: `npm run ollama:check` — proves both endpoints work before anything else.
 if (isMain(import.meta.url)) {
   console.log(`chat model:  ${CHAT_MODEL}`)
