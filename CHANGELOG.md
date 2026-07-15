@@ -9,7 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Local model switcher: choose the model from a curated catalog above the composer, with a one-time download hint for models that aren't pulled yet.
+- Docs and "Report an issue" links in the sidebar footer (the issue report is prefilled with the active model and surface).
 - Add this changelog to track human-curated release notes going forward.
+
+### Fixed
+
+- Desktop: poll `/api/health` before the first request so a cold launch no longer races the sidecar and flashes onboarding.
 
 ## [0.8.0] - 2026-07-14
 
