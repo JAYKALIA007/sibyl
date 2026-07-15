@@ -11,12 +11,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Add this changelog to track human-curated release notes going forward.
 
-## [0.7.2] - 2026-07-12
+## [0.8.0] - 2026-07-14
+
+### Added
+
+- Added streaming SQL token updates to the GUI.
 
 ### Changed
 
-- Automated the release workflow so version tags build and publish both release channels.
-- Updated the package version to `0.7.2`.
+- Updated the package version to `0.8.0`.
 
-[Unreleased]: https://github.com/JAYKALIA007/sibyl/compare/v0.7.2...HEAD
-[0.7.2]: https://github.com/JAYKALIA007/sibyl/releases/tag/v0.7.2
+[Unreleased]: https://github.com/JAYKALIA007/sibyl/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/JAYKALIA007/sibyl/releases/tag/v0.8.0
