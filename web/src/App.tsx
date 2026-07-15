@@ -6,7 +6,7 @@ import { Sidebar } from './Sidebar'
 import { AddConnectionModal } from './AddConnectionModal'
 import { Onboarding } from './Onboarding'
 import { faultBus } from './faults'
-import { getModels, getSetup, waitForSidecar } from './api'
+import { getModels, getSetup, pullModel, waitForSidecar } from './api'
 import { useActiveConnection, type ActiveConnection } from './useActiveConnection'
 import { currentTheme, setTheme, type Theme } from './theme'
 import { PlusIcon, DatabaseIcon, SidebarIcon } from './components/icons'
@@ -16,6 +16,10 @@ const COLLAPSE_KEY = 'sibyl-sidebar-collapsed'
 const MODEL_KEY = 'sibyl-model'
 
 const NO_MODELS: ModelsInfo = { active: '', installed: [], catalog: [] }
+
+// Per-model download state, keyed by model name. `percent` is null while Ollama is
+// still resolving the manifest (before byte counts arrive).
+export type PullState = { percent: number | null; status: string } | { error: string }
 
 export function App() {
   const [theme, setThemeState] = useState<Theme>(currentTheme)
@@ -38,6 +42,32 @@ export function App() {
     } catch {
       // storage unavailable — the choice just won't persist across reloads
     }
+  }
+
+  // In-app model download. Lives here (not in the picker) so progress survives the
+  // dropdown closing. On success we refetch the installed list and select the model.
+  const [pulls, setPulls] = useState<Record<string, PullState>>({})
+  function startPull(name: string) {
+    if (pulls[name] && !('error' in pulls[name])) return // already downloading
+    setPulls((p) => ({ ...p, [name]: { percent: null, status: 'starting' } }))
+    pullModel(name, {
+      onProgress: ({ status, total, completed }) => {
+        const percent = total ? Math.round(((completed ?? 0) / total) * 100) : null
+        setPulls((p) => ({ ...p, [name]: { percent, status } }))
+      },
+    })
+      .then(() => {
+        setPulls((p) => {
+          const next = { ...p }
+          delete next[name]
+          return next
+        })
+        getModels().then(setModels)
+        selectModel(name)
+      })
+      .catch((e) => {
+        setPulls((p) => ({ ...p, [name]: { error: e instanceof Error ? e.message : String(e) } }))
+      })
   }
 
   // Resetting the thread on a connection switch needs the assistant-ui runtime, which
@@ -75,6 +105,8 @@ export function App() {
         models={models}
         selectedModel={selectedModel}
         onSelectModel={selectModel}
+        pulls={pulls}
+        onPull={startPull}
       />
     </SibylRuntimeProvider>
   )
@@ -90,6 +122,8 @@ function Workspace({
   models,
   selectedModel,
   onSelectModel,
+  pulls,
+  onPull,
 }: {
   theme: Theme
   onToggleTheme: () => void
@@ -98,6 +132,8 @@ function Workspace({
   models: ModelsInfo
   selectedModel: string | undefined
   onSelectModel: (name: string) => void
+  pulls: Record<string, PullState>
+  onPull: (name: string) => void
 }) {
   const runtime = useAssistantRuntime()
   const [addingOpen, setAddingOpen] = useState(false)
@@ -166,6 +202,8 @@ function Workspace({
               models={models}
               selectedModel={selectedModel}
               onSelectModel={onSelectModel}
+              pulls={pulls}
+              onPull={onPull}
             />
           ) : (
             <NoConnectionState hasSaved={list.length > 0} onAdd={() => setAddingOpen(true)} />

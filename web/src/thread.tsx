@@ -9,6 +9,7 @@ import { EmptyState } from './EmptyState'
 import { Composer } from './Composer'
 import { ModelPicker } from './ModelPicker'
 import { UserMessage, AssistantMessage } from './ThreadMessages'
+import type { PullState } from './App'
 import type { Meta, ModelsInfo } from './types'
 
 export function Thread({
@@ -17,12 +18,16 @@ export function Thread({
   models,
   selectedModel,
   onSelectModel,
+  pulls,
+  onPull,
 }: {
   meta: Meta | null
   suggestions: string[] | null
   models: ModelsInfo
   selectedModel: string | undefined
   onSelectModel: (name: string) => void
+  pulls: Record<string, PullState>
+  onPull: (name: string) => void
 }) {
   return (
     <ThreadPrimitive.Root className="flex h-full flex-col bg-background">
@@ -37,7 +42,14 @@ export function Thread({
 
       <div className="border-t border-border bg-background/80 backdrop-blur">
         <div className="mx-auto w-full max-w-3xl px-4 pb-3 pt-2">
-          <StatusBar meta={meta} models={models} selectedModel={selectedModel} onSelectModel={onSelectModel} />
+          <StatusBar
+            meta={meta}
+            models={models}
+            selectedModel={selectedModel}
+            onSelectModel={onSelectModel}
+            pulls={pulls}
+            onPull={onPull}
+          />
           <Composer />
         </div>
       </div>
@@ -50,11 +62,15 @@ function StatusBar({
   models,
   selectedModel,
   onSelectModel,
+  pulls,
+  onPull,
 }: {
   meta: Meta | null
   models: ModelsInfo
   selectedModel: string | undefined
   onSelectModel: (name: string) => void
+  pulls: Record<string, PullState>
+  onPull: (name: string) => void
 }) {
   return (
     <div className="mb-2 flex items-center gap-1.5 px-1 text-xs text-muted-foreground">
@@ -67,7 +83,13 @@ function StatusBar({
         <span>connecting…</span>
       )}
       <span className="opacity-50">·</span>
-      <ModelPicker models={models} selected={selectedModel} onSelect={onSelectModel} />
+      <ModelPicker
+        models={models}
+        selected={selectedModel}
+        onSelect={onSelectModel}
+        pulls={pulls}
+        onPull={onPull}
+      />
     </div>
   )
 }

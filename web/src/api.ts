@@ -138,6 +138,60 @@ export async function getModels(): Promise<ModelsInfo> {
   }
 }
 
+// Pull a catalog model, reading Ollama's download progress back over SSE. Fires
+// onProgress for each update and resolves when the pull completes; throws on error.
+export type PullProgress = { status: string; total?: number; completed?: number }
+export async function pullModel(
+  name: string,
+  callbacks: { onProgress?: (p: PullProgress) => void } = {},
+): Promise<void> {
+  let res: Response
+  try {
+    res = await fetch(`${API}/models/pull`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name }),
+    })
+  } catch (e) {
+    throw new SibylFault(`network error: ${String(e)}`)
+  }
+  if (!res.ok) {
+    const body = (await res.json().catch(() => null)) as Fault | null
+    throw new SibylFault(body?.error ?? `server error ${res.status}`)
+  }
+
+  const reader = res.body!.getReader()
+  const decoder = new TextDecoder()
+  let buf = ''
+  let done = false
+
+  while (true) {
+    const { done: streamDone, value } = await reader.read()
+    if (streamDone) break
+    buf += decoder.decode(value, { stream: true })
+    const lines = buf.split('\n')
+    buf = lines.pop() ?? ''
+    for (const line of lines) {
+      if (!line.startsWith('data: ')) continue
+      let event: { type: string; status?: string; total?: number; completed?: number; error?: string }
+      try {
+        event = JSON.parse(line.slice(6))
+      } catch {
+        continue
+      }
+      if (event.type === 'progress' && event.status) {
+        callbacks.onProgress?.({ status: event.status, total: event.total, completed: event.completed })
+      } else if (event.type === 'done') {
+        done = true
+      } else if (event.type === 'error') {
+        throw new SibylFault(event.error ?? 'pull error')
+      }
+    }
+  }
+
+  if (!done) throw new SibylFault('pull ended without completing')
+}
+
 export async function getSetup(): Promise<Setup> {
   try {
     const res = await fetch(`${API}/setup`)

@@ -1,11 +1,14 @@
-// The model switcher — a small dropdown above the composer. Lists the curated coding
-// models (installed = selectable, not-installed = a pull affordance) plus any other
-// installed models the user brought (off-catalog, flagged "not tested for SQL"). The
-// choice is owned by App (persisted to localStorage) and sent with each /api/ask.
+// The model switcher: a small dropdown above the composer. Lists the curated coding
+// models (installed = selectable, not-installed = a Download button that pulls the
+// model in-app with a progress bar) plus any other installed models the user brought
+// (off-catalog, flagged "not tested for SQL"). The choice is owned by App (persisted
+// to localStorage) and sent with each /api/ask; download state is owned by App too so
+// progress survives this menu closing.
 
 import { useEffect, useRef, useState } from 'react'
 import { cn } from './lib/utils'
-import { CheckIcon, ChevronDownIcon, CopyIcon } from './components/icons'
+import { CheckIcon, ChevronDownIcon, DownloadIcon } from './components/icons'
+import type { PullState } from './App'
 import type { ModelsInfo } from './types'
 
 // Ollama tags models as `name:tag` (e.g. `qwen2.5-coder:latest`); a bare catalog name
@@ -14,14 +17,28 @@ function isInstalled(name: string, installed: string[]): boolean {
   return installed.some((m) => m === name || m.split(':')[0] === name)
 }
 
+// Ollama's raw pull statuses are terse and sometimes a bare digest
+// ("pulling 667b0c1932bc"). Show something human instead.
+function prettyStatus(status: string): string {
+  if (status === 'pulling manifest') return 'Preparing'
+  if (/^pulling [0-9a-f]{6,}/.test(status)) return 'Downloading'
+  if (status.startsWith('verifying')) return 'Verifying'
+  if (status.startsWith('writing')) return 'Finishing'
+  return status.charAt(0).toUpperCase() + status.slice(1)
+}
+
 export function ModelPicker({
   models,
   selected,
   onSelect,
+  pulls,
+  onPull,
 }: {
   models: ModelsInfo
   selected: string | undefined
   onSelect: (name: string) => void
+  pulls: Record<string, PullState>
+  onPull: (name: string) => void
 }) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
@@ -69,16 +86,17 @@ export function ModelPicker({
             {catalog.map((m) => (
               <CatalogRow
                 key={m.name}
-                name={m.name}
                 label={m.label}
                 description={m.description}
                 size={m.size}
                 installed={isInstalled(m.name, installed)}
                 selected={effective === m.name}
+                pull={pulls[m.name]}
                 onSelect={() => {
                   onSelect(m.name)
                   setOpen(false)
                 }}
+                onPull={() => onPull(m.name)}
               />
             ))}
 
@@ -117,61 +135,76 @@ export function ModelPicker({
 }
 
 function CatalogRow({
-  name,
   label,
   description,
   size,
   installed,
   selected,
+  pull,
   onSelect,
+  onPull,
 }: {
-  name: string
   label: string
   description: string
   size: string
   installed: boolean
   selected: boolean
+  pull: PullState | undefined
   onSelect: () => void
+  onPull: () => void
 }) {
-  const [copied, setCopied] = useState(false)
-
-  async function copyPull(e: React.MouseEvent) {
-    e.stopPropagation()
-    try {
-      await navigator.clipboard.writeText(`ollama pull ${name}`)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 8000)
-    } catch {
-      // clipboard blocked — the command is still shown in the title
-    }
-  }
-
   if (!installed) {
+    // Actively downloading: show a progress bar in place of the Download button.
+    if (pull && !('error' in pull)) {
+      const pct = pull.percent
+      return (
+        <div className="rounded-lg px-2 py-1.5">
+          <div className="flex items-start gap-2">
+            <span className="h-4 w-4 shrink-0" />
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-sm">
+                {label} <span className="text-[11px] text-muted-foreground">{size}</span>
+              </span>
+              <span className="mt-1.5 block h-1 overflow-hidden rounded-full bg-muted">
+                <span
+                  className={cn(
+                    'block h-full rounded-full bg-primary transition-all',
+                    pct === null && 'w-1/3 animate-pulse',
+                  )}
+                  style={pct === null ? undefined : { width: `${pct}%` }}
+                />
+              </span>
+              <span className="mt-1 block text-[11px] text-muted-foreground">
+                {pct === null ? `${prettyStatus(pull.status)}…` : `${prettyStatus(pull.status)} ${pct}%`}
+              </span>
+            </span>
+          </div>
+        </div>
+      )
+    }
+
+    const errored = !!pull && 'error' in pull
     return (
       <div className="rounded-lg px-2 py-1.5">
-        <div className="flex items-start gap-2 opacity-70">
+        <div className="flex items-start gap-2">
           <span className="h-4 w-4 shrink-0" />
-          <span className="min-w-0 flex-1">
+          <span className="min-w-0 flex-1 opacity-70">
             <span className="block truncate text-sm">
               {label} <span className="text-[11px] text-muted-foreground">{size}</span>
             </span>
             <span className="block text-[11px] leading-snug text-muted-foreground">{description}</span>
           </span>
           <button
-            onClick={copyPull}
-            title={`ollama pull ${name}`}
+            onClick={onPull}
             className="mt-0.5 inline-flex shrink-0 items-center gap-1 rounded-md border border-border px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
           >
-            {copied ? <CheckIcon className="text-primary" /> : <CopyIcon />}
-            {copied ? 'Copied' : 'Download'}
+            <DownloadIcon />
+            {errored ? 'Retry' : 'Download'}
           </button>
         </div>
-        {copied && (
-          <p className="ml-6 mt-1 rounded-md bg-muted px-2 py-1 font-mono text-[11px] leading-snug text-foreground/80">
-            ollama pull {name}
-            <span className="mt-0.5 block font-sans text-muted-foreground">
-              Run this in your terminal to install, then reopen this menu.
-            </span>
+        {errored && (
+          <p className="ml-6 mt-1 text-[11px] leading-snug text-destructive">
+            Download failed: {(pull as { error: string }).error}
           </p>
         )}
       </div>
