@@ -94,7 +94,7 @@ function SqlResultBlock({
           </div>
           {overflow > 0 && (
             <p className="border-t border-border px-3 py-1.5 text-xs text-muted-foreground">
-              … and {overflow.toLocaleString('en-US')} more row{overflow === 1 ? '' : 's'} — Copy CSV for all
+              … and {overflow.toLocaleString('en-US')} more row{overflow === 1 ? '' : 's'}. Copy CSV for all
             </p>
           )}
         </div>
@@ -113,7 +113,7 @@ function HelpCard() {
   return (
     <div className="flex flex-col gap-3 text-sm">
       <p className="leading-relaxed">
-        Ask anything about your data in plain English — Sibyl writes the SQL, runs it, and
+        Ask anything about your data in plain English. Sibyl writes the SQL, runs it, and
         explains the result. Follow-ups remember the last few turns, so you can say
         “now just the active ones”.
       </p>
@@ -140,7 +140,7 @@ function SchemaBlock({ ddl, tables }: { ddl: string; tables: SchemaTable[] }) {
   return (
     <div className="flex flex-col gap-3">
       <p className="text-sm leading-relaxed">
-        Sibyl prompts with this schema — {tables.length.toLocaleString('en-US')} table
+        Sibyl prompts with this schema: {tables.length.toLocaleString('en-US')} table
         {tables.length === 1 ? '' : 's'} in scope.
       </p>
       <div className="overflow-hidden rounded-md border border-border bg-muted/60">

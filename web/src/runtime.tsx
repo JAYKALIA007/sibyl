@@ -82,7 +82,7 @@ function commandFallbackText(result: CommandResult): string {
     case 'help':
       return 'Sibyl commands'
     case 'schema':
-      return `Schema — ${result.tables.length} table${result.tables.length === 1 ? '' : 's'}`
+      return `Schema: ${result.tables.length} table${result.tables.length === 1 ? '' : 's'}`
     case 'tables':
       return `${result.tables.length} table${result.tables.length === 1 ? '' : 's'}`
     case 'sql':

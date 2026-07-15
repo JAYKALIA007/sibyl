@@ -266,7 +266,7 @@ function FaultBanner() {
   if (!message) return null
   return (
     <div className="flex items-center justify-between gap-3 border-b border-destructive/30 bg-destructive/10 px-4 py-2 text-sm text-destructive">
-      <span>⚠ Can’t reach Sibyl — {message}</span>
+      <span>⚠ Can’t reach Sibyl: {message}</span>
       <button
         onClick={() => setMessage(null)}
         className="rounded px-2 py-0.5 text-xs font-medium hover:bg-destructive/10"

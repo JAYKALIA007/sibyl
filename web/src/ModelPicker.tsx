@@ -56,7 +56,7 @@ export function ModelPicker({
         title="Choose the local model"
       >
         {label}
-        {offCatalog && <span className="text-amber-500" title="Not tested for SQL — results may vary">·</span>}
+        {offCatalog && <span className="text-amber-500" title="Not tested for SQL (results may vary)">·</span>}
         <ChevronDownIcon className="text-[13px] opacity-70" />
       </button>
 
@@ -102,7 +102,7 @@ export function ModelPicker({
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-sm">{m}</span>
                       <span className="block text-[11px] text-amber-600 dark:text-amber-500">
-                        Not tested for SQL — results may vary
+                        Not tested for SQL (results may vary)
                       </span>
                     </span>
                   </button>
@@ -140,7 +140,7 @@ function CatalogRow({
     try {
       await navigator.clipboard.writeText(`ollama pull ${name}`)
       setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
+      setTimeout(() => setCopied(false), 8000)
     } catch {
       // clipboard blocked — the command is still shown in the title
     }
@@ -148,22 +148,32 @@ function CatalogRow({
 
   if (!installed) {
     return (
-      <div className="flex items-start gap-2 rounded-lg px-2 py-1.5 opacity-70">
-        <span className="h-4 w-4 shrink-0" />
-        <span className="min-w-0 flex-1">
-          <span className="block truncate text-sm">
-            {label} <span className="text-[11px] text-muted-foreground">{size}</span>
+      <div className="rounded-lg px-2 py-1.5">
+        <div className="flex items-start gap-2 opacity-70">
+          <span className="h-4 w-4 shrink-0" />
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-sm">
+              {label} <span className="text-[11px] text-muted-foreground">{size}</span>
+            </span>
+            <span className="block text-[11px] leading-snug text-muted-foreground">{description}</span>
           </span>
-          <span className="block text-[11px] leading-snug text-muted-foreground">{description}</span>
-        </span>
-        <button
-          onClick={copyPull}
-          title={`ollama pull ${name}`}
-          className="mt-0.5 inline-flex shrink-0 items-center gap-1 rounded-md border border-border px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-        >
-          {copied ? <CheckIcon className="text-primary" /> : <CopyIcon />}
-          {copied ? 'Copied' : 'Download'}
-        </button>
+          <button
+            onClick={copyPull}
+            title={`ollama pull ${name}`}
+            className="mt-0.5 inline-flex shrink-0 items-center gap-1 rounded-md border border-border px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          >
+            {copied ? <CheckIcon className="text-primary" /> : <CopyIcon />}
+            {copied ? 'Copied' : 'Download'}
+          </button>
+        </div>
+        {copied && (
+          <p className="ml-6 mt-1 rounded-md bg-muted px-2 py-1 font-mono text-[11px] leading-snug text-foreground/80">
+            ollama pull {name}
+            <span className="mt-0.5 block font-sans text-muted-foreground">
+              Run this in your terminal to install, then reopen this menu.
+            </span>
+          </p>
+        )}
       </div>
     )
   }

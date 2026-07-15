@@ -72,7 +72,7 @@ export function EmptyState({ suggestions }: { suggestions: string[] | null }) {
       : stage === 'ready'
         ? 'Ready'
         : stage === 'fallback'
-          ? 'Ask anything about your data — or type / for commands.'
+          ? 'Ask anything about your data, or type / for commands.'
           : 'Plain English in, SQL and answers out.'
 
   return (

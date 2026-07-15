@@ -18,10 +18,10 @@ export const EMBED_MODEL = process.env.SIBYL_EMBED_MODEL || 'nomic-embed-text'
 export type CatalogModel = { name: string; label: string; description: string; size: string }
 export const MODEL_CATALOG: CatalogModel[] = [
   { name: 'qwen2.5-coder', label: 'Qwen2.5 Coder', description: 'Default. Strong, proven SQL generation; scales down to 8 GB.', size: '~4.7 GB' },
-  { name: 'qwen3-coder', label: 'Qwen3 Coder', description: "2026's best-in-class local coder. Needs ~16 GB.", size: '~9–12 GB' },
-  { name: 'deepseek-coder-v2', label: 'DeepSeek Coder V2', description: 'Strong reasoning — shines on gnarly multi-join / subquery SQL.', size: '~9 GB' },
+  { name: 'qwen3-coder', label: 'Qwen3 Coder', description: "2026's best-in-class local coder. Needs ~16 GB.", size: '~9-12 GB' },
+  { name: 'deepseek-coder-v2', label: 'DeepSeek Coder V2', description: 'Strong reasoning; shines on gnarly multi-join / subquery SQL.', size: '~9 GB' },
   { name: 'codestral', label: 'Codestral', description: "Mistral's dedicated 22B coder. Needs ~16 GB VRAM.", size: '~13 GB' },
-  { name: 'llama3.1', label: 'Llama 3.1', description: 'Popular general model — the one most people already have.', size: '~4.9 GB' },
+  { name: 'llama3.1', label: 'Llama 3.1', description: 'Popular general model, the one most people already have.', size: '~4.9 GB' },
 ]
 
 // Ollama's runtime default context window is only 2048 tokens, regardless of what

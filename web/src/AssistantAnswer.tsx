@@ -132,7 +132,7 @@ function ResultTable({
       </div>
       {overflow > 0 && (
         <p className="border-t border-border px-3 py-1.5 text-xs text-muted-foreground">
-          … and {overflow.toLocaleString('en-US')} more row{overflow === 1 ? '' : 's'} — Copy CSV for all
+          … and {overflow.toLocaleString('en-US')} more row{overflow === 1 ? '' : 's'}. Copy CSV for all
         </p>
       )}
     </div>
