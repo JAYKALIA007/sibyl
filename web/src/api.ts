@@ -1,4 +1,4 @@
-import type { AskResult, ConnectionView, Fault, Meta, SchemaInfo, Setup, Turn } from './types'
+import type { AskResult, ConnectionView, Fault, Meta, ModelsInfo, SchemaInfo, Setup, Turn } from './types'
 
 // Runtime-configurable so a future desktop shell (Tauri sidecar) can point the same
 // build at a dynamic port. Default '/api' is proxied to Express by Vite in dev.
@@ -13,13 +13,14 @@ export async function ask(
   question: string,
   history: Turn[],
   connectionId: string,
+  model?: string,
 ): Promise<AskResult> {
   let res: Response
   try {
     res = await fetch(`${API}/ask`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ question, history, connectionId }),
+      body: JSON.stringify({ question, history, connectionId, model }),
     })
   } catch (e) {
     throw new SibylFault(`network error: ${String(e)}`)
@@ -48,13 +49,14 @@ export async function askStream(
   history: Turn[],
   connectionId: string,
   callbacks: AskStreamCallbacks = {},
+  model?: string,
 ): Promise<AskResult> {
   let res: Response
   try {
     res = await fetch(`${API}/ask/stream`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ question, history, connectionId }),
+      body: JSON.stringify({ question, history, connectionId, model }),
     })
   } catch (e) {
     throw new SibylFault(`network error: ${String(e)}`)
@@ -121,6 +123,18 @@ export async function waitForSidecar(timeoutMs = 8000): Promise<void> {
     }
     await new Promise((r) => setTimeout(r, delay))
     delay = Math.min(delay * 1.5, 500)
+  }
+}
+
+// The model switcher's data — catalog + installed + default. On any failure returns
+// an empty-but-valid shape so the UI degrades to "just the default" rather than erroring.
+export async function getModels(): Promise<ModelsInfo> {
+  try {
+    const res = await fetch(`${API}/models`)
+    if (!res.ok) throw new Error(`status ${res.status}`)
+    return (await res.json()) as ModelsInfo
+  } catch {
+    return { active: '', installed: [], catalog: [] }
   }
 }
 

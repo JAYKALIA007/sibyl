@@ -55,7 +55,7 @@ export function AddConnectionModal({
             className="w-full rounded-md border border-border bg-background px-2.5 py-1.5 font-mono text-xs outline-none focus:border-primary/40 focus:ring-2 focus:ring-primary/10"
           />
           <p className="mt-1 text-[11px] leading-snug text-muted-foreground">
-            Use a read-only role (e.g. <code className="font-mono">sibyl_ro</code>) — Sibyl only ever reads.
+            Use a read-only role (e.g. <code className="font-mono">sibyl_ro</code>). Sibyl only ever reads.
           </p>
         </Field>
 

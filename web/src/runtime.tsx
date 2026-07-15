@@ -82,7 +82,7 @@ function commandFallbackText(result: CommandResult): string {
     case 'help':
       return 'Sibyl commands'
     case 'schema':
-      return `Schema — ${result.tables.length} table${result.tables.length === 1 ? '' : 's'}`
+      return `Schema: ${result.tables.length} table${result.tables.length === 1 ? '' : 's'}`
     case 'tables':
       return `${result.tables.length} table${result.tables.length === 1 ? '' : 's'}`
     case 'sql':
@@ -92,14 +92,19 @@ function commandFallbackText(result: CommandResult): string {
   }
 }
 
-// The adapter closes over a ref to the active connection id (not a value), so a
-// connection switch is reflected on the next run without rebuilding the runtime.
-// The thread resets on switch (App), so no in-flight run straddles two DBs.
-function makeAdapter(connRef: { current: string | null }): ChatModelAdapter {
+// The adapter closes over refs to the active connection id and selected model (not
+// values), so a connection switch or model change is reflected on the next run without
+// rebuilding the runtime. The thread resets on switch (App), so no in-flight run
+// straddles two DBs.
+function makeAdapter(
+  connRef: { current: string | null },
+  modelRef: { current: string | undefined },
+): ChatModelAdapter {
   return {
     async *run({ messages }) {
       const connectionId = connRef.current
       if (!connectionId) throw new SibylFault('no active connection')
+      const model = modelRef.current
 
       const question = lastUserText(messages)
       // Capped {question, sql} buffer derived from prior SUCCESSFUL turns only —
@@ -147,7 +152,7 @@ function makeAdapter(connRef: { current: string | null }): ChatModelAdapter {
         askStream(question, history, connectionId, {
           onSqlToken: (t) => { sqlSoFar += t; notify() },
           onRetry: () => { sqlSoFar = ''; notify() },
-        })
+        }, model)
           .then((r) => { finalResult = r; done = true; notify() })
           .catch((e) => { streamError = e; done = true; notify() })
 
@@ -184,14 +189,18 @@ function makeAdapter(connRef: { current: string | null }): ChatModelAdapter {
 
 export function SibylRuntimeProvider({
   activeConnectionId,
+  activeModel,
   children,
 }: {
   activeConnectionId: string | null
+  activeModel: string | undefined
   children: ReactNode
 }) {
   const connRef = useRef(activeConnectionId)
   connRef.current = activeConnectionId
-  const adapter = useMemo(() => makeAdapter(connRef), [])
+  const modelRef = useRef(activeModel)
+  modelRef.current = activeModel
+  const adapter = useMemo(() => makeAdapter(connRef, modelRef), [])
   const runtime = useLocalRuntime(adapter)
   return <AssistantRuntimeProvider runtime={runtime}>{children}</AssistantRuntimeProvider>
 }

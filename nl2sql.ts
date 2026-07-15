@@ -56,10 +56,10 @@ function extractSql(raw: string): string {
 export async function toSql(
   ddl: string,
   question: string,
-  opts: { temperature?: number; feedback?: Feedback; history?: Turn[]; onToken?: (t: string) => void } = {}
+  opts: { temperature?: number; feedback?: Feedback; history?: Turn[]; onToken?: (t: string) => void; model?: string } = {}
 ): Promise<{ sql: string; usage: Usage }> {
   const prompt = buildPrompt(ddl, question, { feedback: opts.feedback, history: opts.history })
-  const genOpts = { temperature: opts.temperature ?? 0, system: SYSTEM }
+  const genOpts = { temperature: opts.temperature ?? 0, system: SYSTEM, model: opts.model }
 
   if (opts.onToken) {
     const { text, usage } = await generateStream(prompt, { ...genOpts, onToken: opts.onToken })

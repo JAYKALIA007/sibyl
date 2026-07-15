@@ -7,10 +7,23 @@ import { ThreadPrimitive } from '@assistant-ui/react'
 import { cn } from './lib/utils'
 import { EmptyState } from './EmptyState'
 import { Composer } from './Composer'
+import { ModelPicker } from './ModelPicker'
 import { UserMessage, AssistantMessage } from './ThreadMessages'
-import type { Meta } from './types'
+import type { Meta, ModelsInfo } from './types'
 
-export function Thread({ meta, suggestions }: { meta: Meta | null; suggestions: string[] | null }) {
+export function Thread({
+  meta,
+  suggestions,
+  models,
+  selectedModel,
+  onSelectModel,
+}: {
+  meta: Meta | null
+  suggestions: string[] | null
+  models: ModelsInfo
+  selectedModel: string | undefined
+  onSelectModel: (name: string) => void
+}) {
   return (
     <ThreadPrimitive.Root className="flex h-full flex-col bg-background">
       <ThreadPrimitive.Viewport className="flex-1 overflow-y-auto">
@@ -24,7 +37,7 @@ export function Thread({ meta, suggestions }: { meta: Meta | null; suggestions: 
 
       <div className="border-t border-border bg-background/80 backdrop-blur">
         <div className="mx-auto w-full max-w-3xl px-4 pb-3 pt-2">
-          <StatusBar meta={meta} />
+          <StatusBar meta={meta} models={models} selectedModel={selectedModel} onSelectModel={onSelectModel} />
           <Composer />
         </div>
       </div>
@@ -32,19 +45,29 @@ export function Thread({ meta, suggestions }: { meta: Meta | null; suggestions: 
   )
 }
 
-function StatusBar({ meta }: { meta: Meta | null }) {
+function StatusBar({
+  meta,
+  models,
+  selectedModel,
+  onSelectModel,
+}: {
+  meta: Meta | null
+  models: ModelsInfo
+  selectedModel: string | undefined
+  onSelectModel: (name: string) => void
+}) {
   return (
     <div className="mb-2 flex items-center gap-1.5 px-1 text-xs text-muted-foreground">
       <span className={cn('h-1.5 w-1.5 rounded-full', meta ? 'bg-emerald-500' : 'bg-amber-500')} />
       {meta ? (
         <span>
           {meta.tables.toLocaleString('en-US')} table{meta.tables === 1 ? '' : 's'}
-          <span className="mx-1.5 opacity-50">·</span>
-          {meta.model}
         </span>
       ) : (
         <span>connecting…</span>
       )}
+      <span className="opacity-50">·</span>
+      <ModelPicker models={models} selected={selectedModel} onSelect={onSelectModel} />
     </div>
   )
 }

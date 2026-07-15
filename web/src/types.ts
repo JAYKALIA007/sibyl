@@ -28,6 +28,13 @@ export type Fault = { kind: 'fault'; error: string }
 // Status-bar metadata (server: GET /api/meta).
 export type Meta = { tables: number; model: string; database: string }
 
+// The model switcher's data (server: GET /api/models). `catalog` is the curated,
+// tested-for-SQL set; `installed` is what Ollama actually has pulled; `active` is the
+// server default. A catalog entry not in `installed` needs pulling; an `installed`
+// name not in `catalog` is an off-catalog model (selectable, "not tested" note).
+export type CatalogModel = { name: string; label: string; description: string; size: string }
+export type ModelsInfo = { active: string; installed: string[]; catalog: CatalogModel[] }
+
 // First-run readiness of the local LLM (server: GET /api/setup). Backs the
 // onboarding flow — 'unreachable' = Ollama not installed/running, 'model-missing'
 // = installed but the chat model isn't pulled yet.
