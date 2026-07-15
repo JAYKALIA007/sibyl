@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 // Usage: node scripts/bump-version.mjs <new-version>
-// Updates all three version sources (package.json, tauri.conf.json, Cargo.toml)
-// and the sibyl-desktop entry in Cargo.lock in one shot.
+// Updates all four version sources (package.json, tauri.conf.json, Cargo.toml,
+// the sibyl-desktop entry in Cargo.lock) AND rolls the CHANGELOG's Unreleased
+// section into a dated version section, in one shot.
 
-import { readFileSync, writeFileSync } from 'node:fs'
-import { execSync } from 'node:child_process'
+import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 
 const version = process.argv[2]
 if (!version || !/^\d+\.\d+\.\d+$/.test(version)) {
@@ -22,10 +22,52 @@ function bumpJson(path, updater) {
 function bumpText(path, pattern, replacement) {
   const text = readFileSync(path, 'utf8')
   if (!pattern.test(text)) {
-    console.error(`  no match in ${path} — pattern: ${pattern}`)
+    console.error(`  no match in ${path}, pattern: ${pattern}`)
     process.exit(1)
   }
   writeFileSync(path, text.replace(pattern, replacement))
+  console.log(`  ${path}`)
+}
+
+// Roll CHANGELOG's `## [Unreleased]` block into a dated `## [version]` section,
+// leave a fresh empty Unreleased, and wire the compare/tag link references. A
+// no-op (with a warning) if there's no changelog or nothing under Unreleased,
+// so the version bump still succeeds and you can edit the notes by hand.
+function bumpChangelog(path) {
+  if (!existsSync(path)) {
+    console.warn(`  (no ${path}, skipping changelog)`)
+    return
+  }
+  const text = readFileSync(path, 'utf8')
+
+  const section = text.match(/## \[Unreleased\]\s*\n([\s\S]*?)(?=\n## \[)/)
+  if (!section) {
+    console.warn(`  (no [Unreleased] section in ${path}, skipping)`)
+    return
+  }
+  const body = section[1].trim()
+  if (!body) {
+    console.warn(`  (${path} [Unreleased] is empty, add notes by hand)`)
+    return
+  }
+
+  const date = new Date().toISOString().slice(0, 10)
+  let next = text.replace(
+    /## \[Unreleased\]\s*\n[\s\S]*?(?=\n## \[)/,
+    `## [Unreleased]\n\n## [${version}] - ${date}\n\n${body}\n`,
+  )
+
+  // Repoint the Unreleased compare link at the new tag and add the tag's own link.
+  const unreleased = next.match(/\[Unreleased\]:\s*(\S+?)\/compare\/\S+/)
+  if (unreleased) {
+    const base = unreleased[1] // e.g. https://github.com/OWNER/REPO
+    next = next.replace(
+      /\[Unreleased\]:\s*\S+/,
+      `[Unreleased]: ${base}/compare/v${version}...HEAD\n[${version}]: ${base}/releases/tag/v${version}`,
+    )
+  }
+
+  writeFileSync(path, next)
   console.log(`  ${path}`)
 }
 
@@ -49,4 +91,6 @@ if (next === lock) {
 writeFileSync('src-tauri/Cargo.lock', next)
 console.log('  src-tauri/Cargo.lock')
 
-console.log(`\ndone — commit, push, then: git tag v${version} && git push origin v${version}`)
+bumpChangelog('CHANGELOG.md')
+
+console.log(`\ndone. commit, push, then: git tag v${version} && git push origin v${version}`)

@@ -6,12 +6,17 @@ Releases are automated by [`.github/workflows/release.yml`](.github/workflows/re
 
 ## Cut a release
 
-1. **Bump the version** in one PR (`chore(release): x.y.z`) and merge it:
+1. **Bump the version** in one PR (`chore(release): x.y.z`) and merge it. Run
+   `pnpm bump x.y.z`, which updates all four version files and rolls the
+   `CHANGELOG.md` `Unreleased` notes into a dated version section:
    - `package.json`
    - `src-tauri/tauri.conf.json`
    - `src-tauri/Cargo.toml`
    - `src-tauri/Cargo.lock` (the `sibyl-desktop` entry)
-   - `CHANGELOG.md` (move release notes from `Unreleased` into the new version)
+   - `CHANGELOG.md` (`Unreleased` into the new version, with compare/tag links)
+
+   Curate the `Unreleased` section as you go (in each feature PR) so the roll
+   picks the notes up. Review the diff before committing.
 
 2. **Tag and push:**
    ```bash
