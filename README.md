@@ -198,16 +198,17 @@ onboarding create it.
 <details>
 <summary><b>Model swap</b> + the eval scoreboard + context window + token meter</summary>
 
-**Two tiers, picked by the eval.** The in-app switcher offers two models; we ran the
-38-case execution-accuracy eval (below) across five local coders to choose them:
+**Scored by the eval.** The in-app switcher lists all five; we ran the 38-case
+execution-accuracy eval (below) across them so you can trade size for accuracy with
+open eyes. The lightweight coder is the default; the rest are one-click select/download:
 
 | Model | Score | Size | |
 |---|---|---|---|
 | **qwen2.5-coder** | 87% | ~4.7 GB | **default** — best value, runs on 8 GB |
-| **qwen3-coder** | 100% | ~18 GB | one-click upgrade — most accurate, heavy |
-| codestral | 89% | ~13 GB | dropped: +2% over default for 3× the size |
-| deepseek-coder-v2 | 87% | ~9 GB | dropped: matched by the 4.7 GB default |
-| llama3.1 | 74% | ~4.9 GB | dropped: weakest |
+| qwen3-coder | 100% | ~18 GB | most accurate; heavy |
+| codestral | 89% | ~13 GB | strong; needs ~16 GB |
+| deepseek-coder-v2 | 87% | ~9 GB | solid on multi-join SQL |
+| llama3.1 | 74% | ~4.9 GB | general model many already have |
 
 Any Ollama-served model still works via `SIBYL_CHAT_MODEL`, and the switcher lets you
 pick any other model you already have (marked "not tested"):
@@ -216,8 +217,8 @@ pick any other model you already have (marked "not tested"):
 SIBYL_CHAT_MODEL=qwen3-coder
 ```
 
-Larger = better SQL; the scoreboard is why we default to the light one and offer the
-big one as a deliberate upgrade rather than the out-of-box cost.
+Larger = better SQL; the scoreboard is why we default to the light one and leave the
+bigger ones a deliberate upgrade rather than the out-of-box cost.
 
 Ollama's default context is only 2,048 tokens; Sibyl raises it to 8,192. Override with
 `SIBYL_NUM_CTX` (qwen2.5-coder supports up to 32,768).

@@ -18,7 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Expanded the execution-accuracy eval from 19 to 38 cases (correlated subqueries, EXCEPT/anti-joins, per-group maxima, conditional aggregation, and more).
-- Trimmed the model catalog to two tiers picked by the eval: `qwen2.5-coder` (default, best value) and `qwen3-coder` (one-click accuracy upgrade). Dropped `deepseek-coder-v2`, `codestral`, and `llama3.1` as dominated or weak value.
+- Scored all five catalog models against the eval and surfaced each score in the switcher, so the accuracy/size trade-off is explicit. `qwen2.5-coder` stays the default (best value); the heavier coders remain one-click select/download upgrades.
 
 ### Fixed
 

@@ -12,15 +12,18 @@ const OLLAMA = process.env.OLLAMA_HOST || 'http://localhost:11434'
 export const CHAT_MODEL = process.env.SIBYL_CHAT_MODEL || 'qwen2.5-coder'
 export const EMBED_MODEL = process.env.SIBYL_EMBED_MODEL || 'nomic-embed-text'
 
-// The curated set of local coding models we recommend + have tested for SQL. Two
-// tiers, picked by our 38-case execution-accuracy eval (see README): a lightweight
-// default and a heavier accuracy upgrade. The switcher shows these; a user can still
-// run any other installed model (off-catalog, surfaced with a "not tested" note).
-// Both are pullable via Ollama.
+// The curated set of local coding models we recommend + have tested for SQL, each
+// scored by our 38-case execution-accuracy eval (see README). The switcher lists all
+// of them: the lightweight coder is the default, the rest are one-click upgrades a
+// user can select or download in-app. A user can also run any other installed model
+// (off-catalog, surfaced with a "not tested" note). All are pullable via Ollama.
 export type CatalogModel = { name: string; label: string; description: string; size: string }
 export const MODEL_CATALOG: CatalogModel[] = [
   { name: 'qwen2.5-coder', label: 'Qwen2.5 Coder', description: 'Default. Best value: 87% on our SQL eval, runs on 8 GB.', size: '~4.7 GB' },
   { name: 'qwen3-coder', label: 'Qwen3 Coder', description: 'Most accurate: 100% on our SQL eval. Large, needs ~18 GB free.', size: '~18 GB' },
+  { name: 'codestral', label: 'Codestral', description: "Mistral's 22B coder: 89% on our SQL eval. Needs ~16 GB.", size: '~13 GB' },
+  { name: 'deepseek-coder-v2', label: 'DeepSeek Coder V2', description: 'Strong on multi-join SQL: 87% on our eval.', size: '~9 GB' },
+  { name: 'llama3.1', label: 'Llama 3.1', description: 'General model many already have. 74% on our SQL eval.', size: '~4.9 GB' },
 ]
 
 // Ollama's runtime default context window is only 2048 tokens, regardless of what
