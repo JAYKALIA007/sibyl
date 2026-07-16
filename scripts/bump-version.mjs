@@ -12,13 +12,6 @@ if (!version || !/^\d+\.\d+\.\d+$/.test(version)) {
   process.exit(1)
 }
 
-function bumpJson(path, updater) {
-  const obj = JSON.parse(readFileSync(path, 'utf8'))
-  updater(obj)
-  writeFileSync(path, JSON.stringify(obj, null, 2) + '\n')
-  console.log(`  ${path}`)
-}
-
 function bumpText(path, pattern, replacement) {
   const text = readFileSync(path, 'utf8')
   if (!pattern.test(text)) {
@@ -73,8 +66,10 @@ function bumpChangelog(path) {
 
 console.log(`bumping to ${version}:`)
 
-bumpJson('package.json', (o) => { o.version = version })
-bumpJson('src-tauri/tauri.conf.json', (o) => { o.version = version })
+// Surgical version-field replacements (first "version" match = the top-level one in
+// both JSON files) so we don't re-serialize and reformat the rest of the file.
+bumpText('package.json', /"version":\s*"[^"]*"/, `"version": "${version}"`)
+bumpText('src-tauri/tauri.conf.json', /"version":\s*"[^"]*"/, `"version": "${version}"`)
 bumpText('src-tauri/Cargo.toml', /^version = ".*?"/m, `version = "${version}"`)
 
 // Cargo.lock: update only the [[package]] block for sibyl-desktop, not other
