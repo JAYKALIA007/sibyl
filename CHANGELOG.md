@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-07-16
+
 ### Added
 
 - Local model switcher: choose the model from a curated catalog above the composer.
@@ -34,5 +36,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Updated the package version to `0.8.0`.
 
-[Unreleased]: https://github.com/JAYKALIA007/sibyl/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/JAYKALIA007/sibyl/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/JAYKALIA007/sibyl/releases/tag/v0.9.0
 [0.8.0]: https://github.com/JAYKALIA007/sibyl/releases/tag/v0.8.0
