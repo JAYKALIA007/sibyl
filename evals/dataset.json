@@ -114,5 +114,119 @@
     "rung": "off-schema-refusal",
     "question": "Who is the current CEO of Google?",
     "expect": "refused"
+  },
+  {
+    "id": "multilevel-agg-01",
+    "rung": "multilevel-agg",
+    "question": "How many orders contain more than two distinct products?",
+    "goldSQL": "SELECT COUNT(*) AS n FROM (SELECT order_id FROM order_items GROUP BY order_id HAVING COUNT(DISTINCT product_id) > 2) t"
+  },
+  {
+    "id": "correlated-subquery-01",
+    "rung": "correlated-subquery",
+    "question": "List the names of products priced above the average price of their category.",
+    "goldSQL": "SELECT p.name FROM products p WHERE p.price > (SELECT AVG(p2.price) FROM products p2 WHERE p2.category_id = p.category_id)"
+  },
+  {
+    "id": "hierarchy-self-join-01",
+    "rung": "hierarchy-self-join",
+    "question": "For each category that has a parent category, show the category name and its parent category's name. Exclude top-level categories that have no parent.",
+    "goldSQL": "SELECT c.name AS category, p.name AS parent FROM categories c JOIN categories p ON p.id = c.parent_id"
+  },
+  {
+    "id": "having-multi-01",
+    "rung": "having-multi",
+    "question": "Which categories have at least 3 products and an average product price above 40? List the category names.",
+    "goldSQL": "SELECT c.name FROM products p JOIN categories c ON c.id = p.category_id GROUP BY c.id, c.name HAVING COUNT(*) >= 3 AND AVG(p.price) > 40"
+  },
+  {
+    "id": "null-logic-02",
+    "rung": "null-logic",
+    "question": "How many shipments have been shipped but not yet delivered?",
+    "goldSQL": "SELECT COUNT(*) AS n FROM shipments WHERE shipped_at IS NOT NULL AND delivered_at IS NULL"
+  },
+  {
+    "id": "having-avg-01",
+    "rung": "having-avg",
+    "question": "How many products have an average review rating above 4?",
+    "goldSQL": "SELECT COUNT(*) AS n FROM (SELECT product_id FROM reviews GROUP BY product_id HAVING AVG(rating) > 4) t"
+  },
+  {
+    "id": "top-agg-01",
+    "rung": "top-agg",
+    "question": "Which product has the highest total quantity sold across all orders? Give its name.",
+    "goldSQL": "SELECT p.name FROM products p JOIN order_items oi ON oi.product_id = p.id GROUP BY p.id, p.name ORDER BY SUM(oi.quantity) DESC LIMIT 1"
+  },
+  {
+    "id": "conditional-agg-01",
+    "rung": "conditional-agg",
+    "question": "How many more orders are completed than cancelled?",
+    "goldSQL": "SELECT COUNT(*) FILTER (WHERE status = 'completed') - COUNT(*) FILTER (WHERE status = 'cancelled') AS diff FROM orders"
+  },
+  {
+    "id": "not-exists-01",
+    "rung": "not-exists",
+    "question": "How many products have never been reviewed?",
+    "goldSQL": "SELECT COUNT(*) AS n FROM products p WHERE NOT EXISTS (SELECT 1 FROM reviews r WHERE r.product_id = p.id)"
+  },
+  {
+    "id": "set-diff-01",
+    "rung": "set-diff",
+    "question": "List the names of products that have been ordered but never reviewed.",
+    "goldSQL": "SELECT name FROM products WHERE id IN (SELECT product_id FROM order_items EXCEPT SELECT product_id FROM reviews)"
+  },
+  {
+    "id": "nested-max-01",
+    "rung": "nested-max",
+    "question": "What is the largest number of distinct products in any single order?",
+    "goldSQL": "SELECT MAX(c) AS m FROM (SELECT COUNT(DISTINCT product_id) AS c FROM order_items GROUP BY order_id) t"
+  },
+  {
+    "id": "join-return-01",
+    "rung": "join-return",
+    "question": "How many orders have had at least one item returned?",
+    "goldSQL": "SELECT COUNT(DISTINCT oi.order_id) AS n FROM returns r JOIN order_items oi ON oi.id = r.order_item_id"
+  },
+  {
+    "id": "filter-count-01",
+    "rung": "filter-count",
+    "question": "How many coupons have been used at least once?",
+    "goldSQL": "SELECT COUNT(*) AS n FROM coupons WHERE used_count > 0"
+  },
+  {
+    "id": "coupon-filter-01",
+    "rung": "coupon-filter",
+    "question": "How many orders used a coupon?",
+    "goldSQL": "SELECT COUNT(*) AS n FROM orders WHERE coupon_id IS NOT NULL"
+  },
+  {
+    "id": "most-reviewed-01",
+    "rung": "most-reviewed",
+    "question": "Which product has the most reviews? Give its name.",
+    "goldSQL": "SELECT p.name FROM products p JOIN reviews r ON r.product_id = p.id GROUP BY p.id, p.name ORDER BY COUNT(*) DESC LIMIT 1"
+  },
+  {
+    "id": "multi-join-sum-01",
+    "rung": "multi-join-sum",
+    "question": "What is the total amount of paid payments for orders that used a coupon?",
+    "goldSQL": "SELECT SUM(pmt.amount) AS s FROM payments pmt JOIN orders o ON o.id = pmt.order_id WHERE pmt.status = 'paid' AND o.coupon_id IS NOT NULL"
+  },
+  {
+    "id": "supplier-agg-01",
+    "rung": "supplier-agg",
+    "question": "Which supplier provides the most products? Give the supplier's name.",
+    "goldSQL": "SELECT s.name FROM suppliers s JOIN products p ON p.supplier_id = s.id GROUP BY s.id, s.name ORDER BY COUNT(*) DESC LIMIT 1"
+  },
+  {
+    "id": "wishlist-distinct-01",
+    "rung": "wishlist-distinct",
+    "question": "How many distinct products appear on at least one wishlist?",
+    "goldSQL": "SELECT COUNT(DISTINCT product_id) AS n FROM wishlists"
+  },
+  {
+    "id": "max-per-group-01",
+    "rung": "max-per-group",
+    "question": "For each category, give its name and the name of its most expensive product.",
+    "goldSQL": "SELECT c.name AS category, p.name AS product FROM products p JOIN categories c ON c.id = p.category_id WHERE p.price = (SELECT MAX(p2.price) FROM products p2 WHERE p2.category_id = p.category_id)"
   }
 ]

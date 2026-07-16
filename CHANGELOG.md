@@ -13,6 +13,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - In-app model download: pull a not-installed catalog model straight from the switcher with a live progress bar, no terminal needed.
 - Docs and "Report an issue" links in the sidebar footer (the issue report is prefilled with the active model and surface).
 - Add this changelog to track human-curated release notes going forward.
+- README model scoreboard: results of a 38-case execution-accuracy bake-off across five local coders, explaining the catalog picks.
+
+### Changed
+
+- Expanded the execution-accuracy eval from 19 to 38 cases (correlated subqueries, EXCEPT/anti-joins, per-group maxima, conditional aggregation, and more).
+- Trimmed the model catalog to two tiers picked by the eval: `qwen2.5-coder` (default, best value) and `qwen3-coder` (one-click accuracy upgrade). Dropped `deepseek-coder-v2`, `codestral`, and `llama3.1` as dominated or weak value.
 
 ### Fixed
 
