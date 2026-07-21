@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Desktop: the sidecar now binds a free port picked at launch instead of a hardcoded `47821`, so two Sibyl windows (or a `sibyl serve` alongside the app) no longer collide. The port is handed to the UI at runtime, so it's no longer baked into the web build.
+
 ## [0.9.0] - 2026-07-16
 
 ### Added

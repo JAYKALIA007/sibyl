@@ -6,7 +6,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useThread } from '@assistant-ui/react'
 import { cn } from './lib/utils'
-import { renameConnection, deleteConnection } from './api'
+import { renameConnection, deleteConnection, isDesktop } from './api'
 import {
   SparkleIcon,
   DatabaseIcon,
@@ -27,9 +27,9 @@ const REPO = 'https://github.com/JAYKALIA007/sibyl'
 const DOCS_URL = `${REPO}#readme`
 
 // Prefill a bug/feedback report with the environment so reports arrive with triage
-// context. Surface is inferred from the API base (desktop bakes in the sidecar port).
+// context.
 function feedbackUrl(activeModel: string): string {
-  const surface = import.meta.env.VITE_API_URL?.includes('47821') ? 'desktop' : 'web'
+  const surface = isDesktop ? 'desktop' : 'web'
   const body = [
     '**What happened?**',
     '',
