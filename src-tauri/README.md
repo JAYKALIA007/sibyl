@@ -35,8 +35,14 @@ TypeScript, unchanged — the desktop app is a packaging layer, not a rewrite.
   user's machine is needed except Ollama, which onboarding installs. (Apps launched
   from Finder don't inherit the shell `PATH`, so we can't rely on a system `node` —
   hence bundling one. `pg` is pure-JS, so there's no native addon to worry about.)
-- The UI reaches the sidecar via `VITE_API_URL=http://127.0.0.1:47821/api` (baked into
-  the desktop web build). CORS is enabled on the server for the `tauri://` origin.
+- **Dynamic port**: `main.rs` asks the OS for a free loopback port, starts the sidecar
+  on it, and injects `window.__SIBYL_API__ = 'http://127.0.0.1:<port>/api'` into the
+  webview via an initialization script (runs before any page script, so `api.ts` reads
+  it synchronously). Nothing is baked into the web build, and two instances can run at
+  once. CORS is enabled on the server for the `tauri://` origin.
+- Because the port isn't known until setup, the window is created in `main.rs` rather
+  than at startup — `tauri.conf.json` sets `"create": false` and keeps the window's
+  size/title config, which `WebviewWindowBuilder::from_config` reads back.
 - `src/main.rs` spawns the sidecar on window setup and kills it on exit.
 
 ## Build the DMG
@@ -73,11 +79,5 @@ pnpm tauri dev
    binary for the target triple instead of copying `process.execPath`.
 3. **Smaller bundle** — the bundled Node is ~90 MB. Node SEA (a single-file executable,
    needs a CJS entry) or trimming would shrink it; not worth it for v1.
-4. **Dynamic port** — the port is hardcoded (`47821`). Pick a free port in `main.rs` and
-   hand it to the frontend (window global / Tauri command) instead of baking it.
-5. **Auto-update** — `tauri-plugin-updater` + a release feed.
-6. **Windows/Linux** — `desktop:*` scripts use inline `VAR=val` (POSIX); Windows needs
-   `cross-env`. Bundling would ship the matching Node per platform.
-7. **Sidecar startup race** — if the webview loads before the sidecar is listening, the
-   first API calls fail; the onboarding poll recovers, but a `/api/health` gate would be
-   cleaner.
+4. **Auto-update** — `tauri-plugin-updater` + a release feed.
+5. **Windows/Linux** — bundling would ship the matching Node per platform.

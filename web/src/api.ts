@@ -1,8 +1,20 @@
 import type { AskResult, ConnectionView, Fault, Meta, ModelsInfo, SchemaInfo, Setup, Turn } from './types'
 
-// Runtime-configurable so a future desktop shell (Tauri sidecar) can point the same
-// build at a dynamic port. Default '/api' is proxied to Express by Vite in dev.
-const API = import.meta.env.VITE_API_URL ?? '/api'
+declare global {
+  interface Window {
+    __SIBYL_API__?: string
+  }
+}
+
+// The desktop shell picks a free port for its sidecar at launch and injects the base
+// here before any page script runs, so the SAME build works on both surfaces without
+// baking a port in. In the browser there's no global and '/api' is same-origin (Vite
+// proxies it to Express in dev). VITE_API_URL stays as a manual escape hatch.
+const desktopApi = typeof window === 'undefined' ? undefined : window.__SIBYL_API__
+const API = desktopApi ?? import.meta.env.VITE_API_URL ?? '/api'
+
+// Which surface we're on, for bug-report context. The injected global is the signal.
+export const isDesktop = desktopApi !== undefined
 
 // Thrown for genuine faults (5xx / network) — distinct from the domain outcomes,
 // which come back as a normal AskResult. Callers render this as a banner, not a

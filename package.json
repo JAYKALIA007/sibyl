@@ -46,8 +46,8 @@
     "test": "node --import tsx --test *.test.ts",
     "sidecar:build": "tsup --config tsup.sidecar.config.ts",
     "desktop:bundle-node": "node scripts/bundle-node.mjs",
-    "desktop:build-web": "VITE_API_URL=http://127.0.0.1:47821/api pnpm --filter sibyl-web build",
-    "desktop:dev-web": "VITE_API_URL=http://127.0.0.1:47821/api pnpm --filter sibyl-web dev",
+    "desktop:build-web": "pnpm --filter sibyl-web build",
+    "desktop:dev-web": "pnpm --filter sibyl-web dev",
     "desktop:prep": "pnpm run sidecar:build && pnpm run desktop:bundle-node && pnpm run desktop:build-web",
     "tauri": "tauri",
     "bump": "node scripts/bump-version.mjs"
