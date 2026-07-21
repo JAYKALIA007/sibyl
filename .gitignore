@@ -10,3 +10,6 @@ build/
 
 # npm pack output
 *.tgz
+
+# updater manifest, generated at release time
+/latest.json

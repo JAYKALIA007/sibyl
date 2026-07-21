@@ -6,7 +6,9 @@
 import { useState, useRef, useEffect } from 'react'
 import { useThread } from '@assistant-ui/react'
 import { cn } from './lib/utils'
-import { renameConnection, deleteConnection, isDesktop } from './api'
+import { renameConnection, deleteConnection } from './api'
+import { isDesktop } from './surface'
+import { updateBus } from './updater'
 import {
   SparkleIcon,
   DatabaseIcon,
@@ -19,6 +21,7 @@ import {
   MoreHorizontalIcon,
   BookIcon,
   MessageIcon,
+  DownloadIcon,
 } from './components/icons'
 import type { ConnectionView } from './types'
 import type { Theme } from './theme'
@@ -142,6 +145,14 @@ export function Sidebar({
         >
           <MessageIcon className="text-[15px]" /> Report an issue
         </a>
+        {isDesktop && (
+          <button
+            onClick={() => updateBus.requestCheck()}
+            className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          >
+            <DownloadIcon className="text-[15px]" /> Check for updates
+          </button>
+        )}
         <button
           onClick={onToggleTheme}
           className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"

@@ -5,6 +5,7 @@ import { Thread } from './thread'
 import { Sidebar } from './Sidebar'
 import { AddConnectionModal } from './AddConnectionModal'
 import { Onboarding } from './Onboarding'
+import { UpdateToast } from './UpdateToast'
 import { faultBus } from './faults'
 import { getModels, getSetup, pullModel, waitForSidecar } from './api'
 import { useActiveConnection, type ActiveConnection } from './useActiveConnection'
@@ -96,19 +97,23 @@ export function App() {
   }
 
   return (
-    <SibylRuntimeProvider activeConnectionId={conn.activeId} activeModel={selectedModel}>
-      <Workspace
-        theme={theme}
-        onToggleTheme={toggleTheme}
-        conn={conn}
-        resetThreadRef={resetThreadRef}
-        models={models}
-        selectedModel={selectedModel}
-        onSelectModel={selectModel}
-        pulls={pulls}
-        onPull={startPull}
-      />
-    </SibylRuntimeProvider>
+    <>
+      <SibylRuntimeProvider activeConnectionId={conn.activeId} activeModel={selectedModel}>
+        <Workspace
+          theme={theme}
+          onToggleTheme={toggleTheme}
+          conn={conn}
+          resetThreadRef={resetThreadRef}
+          models={models}
+          selectedModel={selectedModel}
+          onSelectModel={selectModel}
+          pulls={pulls}
+          onPull={startPull}
+        />
+      </SibylRuntimeProvider>
+      {/* After onboarding only — the update opt-in shouldn't compete with the setup gate. */}
+      <UpdateToast />
+    </>
   )
 }
 
