@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Core webview permissions plus the two plugins behind in-app updates.",
+  "windows": ["main"],
+  "permissions": ["core:default", "updater:default", "process:allow-restart"]
+}

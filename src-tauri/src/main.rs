@@ -59,6 +59,11 @@ fn spawn_sidecar(app: &tauri::App, port: u16) -> Result<Child, Box<dyn std::erro
 
 fn main() {
     tauri::Builder::default()
+        // Both drive in-app updates: `updater` checks the release feed and installs,
+        // `process` performs the relaunch afterwards. The frontend decides *whether*
+        // to check (it's opt-in) — these only provide the capability.
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
         .setup(|app| {
             let port = free_port()?;
 

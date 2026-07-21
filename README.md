@@ -66,7 +66,12 @@ Publishes as `sibyl-cli`; the installed command is **`sibyl`**.
 
 ## Features
 
-- **Local & private** — model runs on your machine; nothing leaves it, no API key.
+- **Local & private** — model runs on your machine; your schema, data, and questions
+  never leave it, no API key. The desktop app's one optional network call is an update
+  check, and it asks before making it.
+- **Updates in place** (desktop) — opt in and Sibyl offers new versions as they ship,
+  downloads in the background, and installs on restart. Decline and it never phones
+  home; "Check for updates" in the sidebar is always there if you change your mind.
 - **Read-only & safe** — only ever runs `SELECT` (a guard rejects the rest) and
   auto-injects a `LIMIT`. Point at a **read-only Postgres role** → the database itself
   is the safety wall.

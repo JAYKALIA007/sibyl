@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Desktop: in-app updates. Sibyl asks once, on first run, whether it may check GitHub for new versions — it sends nothing about you, your questions, or your data, and never checks unless you agree. When an update exists a corner toast offers it; downloading shows progress, then "Restart now" installs it. A "Check for updates" item in the sidebar covers anyone who declined. Releases now ship a signed updater archive and a `latest.json` feed alongside the DMG.
+
 ### Fixed
 
 - Desktop: the sidecar now binds a free port picked at launch instead of a hardcoded `47821`, so two Sibyl windows (or a `sibyl serve` alongside the app) no longer collide. The port is handed to the UI at runtime, so it's no longer baked into the web build.

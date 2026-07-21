@@ -44,6 +44,11 @@ TypeScript, unchanged — the desktop app is a packaging layer, not a rewrite.
   than at startup — `tauri.conf.json` sets `"create": false` and keeps the window's
   size/title config, which `WebviewWindowBuilder::from_config` reads back.
 - `src/main.rs` spawns the sidecar on window setup and kills it on exit.
+- **Updates**: `tauri-plugin-updater` polls `latest.json` on the latest GitHub Release
+  and verifies each archive against the minisign public key in `tauri.conf.json`. The
+  check is **opt-in** — the frontend (`web/src/updater.ts`) asks once and stores the
+  answer, so the app makes no outbound request until the user agrees. Release-side
+  setup (signing secrets, the manifest script) is in [`RELEASING.md`](../RELEASING.md).
 
 ## Build the DMG
 
@@ -79,5 +84,5 @@ pnpm tauri dev
    binary for the target triple instead of copying `process.execPath`.
 3. **Smaller bundle** — the bundled Node is ~90 MB. Node SEA (a single-file executable,
    needs a CJS entry) or trimming would shrink it; not worth it for v1.
-4. **Auto-update** — `tauri-plugin-updater` + a release feed.
-5. **Windows/Linux** — bundling would ship the matching Node per platform.
+4. **Windows/Linux** — bundling would ship the matching Node per platform. The updater
+   manifest would also need the matching platform keys (`windows-x86_64`, …).

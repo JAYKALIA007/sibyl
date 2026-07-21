@@ -49,11 +49,26 @@ jobs:
       # the release binary, ad-hoc signs, and produces the .dmg.
       - name: Build app + DMG
         run: pnpm tauri build
+        env:
+          # Signs the updater archive. Without these, the .sig is never produced and
+          # the manifest step below fails loudly rather than shipping an unverifiable
+          # update. See RELEASING.md for how the keypair is set up.
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+
+      # The feed tauri-plugin-updater polls. Must be attached to the release as
+      # `latest.json` — the endpoint in tauri.conf.json resolves via /releases/latest.
+      - name: Build updater manifest
+        run: node scripts/updater-manifest.mjs latest.json
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: src-tauri/target/release/bundle/dmg/*.dmg
+          files: |
+            src-tauri/target/release/bundle/dmg/*.dmg
+            src-tauri/target/release/bundle/macos/*.app.tar.gz
+            src-tauri/target/release/bundle/macos/*.app.tar.gz.sig
+            latest.json
           generate_release_notes: true
           body: |
             ## Download
